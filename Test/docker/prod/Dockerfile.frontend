@@ -1,0 +1,48 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Build arguments
+ARG VITE_API_URL=/api
+
+# Set environment variables for build
+ENV VITE_API_URL=${VITE_API_URL}
+
+# Copy root package files (for frontend)
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies for build)
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Build frontend
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install PM2 globally
+RUN npm install -g pm2
+
+# Copy package files for production dependencies
+COPY package*.json ./
+
+# Install only production dependencies + express & http-proxy-middleware
+RUN npm install --production && \
+    npm install express http-proxy-middleware
+
+# Copy built assets from builder
+COPY --from=builder /app/build ./build
+
+# Copy server.cjs
+COPY server.cjs ./
+
+# Expose port
+EXPOSE 3000
+
+# Production command using PM2
+CMD ["pm2-runtime", "start", "server.cjs", "--name", "frontend"]

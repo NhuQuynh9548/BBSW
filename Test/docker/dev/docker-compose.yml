@@ -1,0 +1,66 @@
+name: bluebolt-dev
+
+# Using existing PostgreSQL on port 5437 (container: pg_thuchi)
+
+services:
+  # Backend API (Development with hot reload)
+  backend:
+    image: bluebolt-backend-dev:latest
+    build:
+      context: ../../src/backend
+      dockerfile: ../../docker/dev/Dockerfile.backend
+    container_name: bluebolt-backend-dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      PORT: ${PORT:-4001}
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      UPLOAD_DIR: ${UPLOAD_DIR:-./uploads}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+    ports:
+      - "${PORT:-4001}:${PORT:-4001}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../../src/backend:/app
+      - /app/node_modules
+      - backend_uploads_dev:/app/uploads
+    networks:
+      - bluebolt-network-dev
+    command: npm run dev
+
+  # Frontend (Development with Vite hot reload)
+  frontend:
+    image: bluebolt-frontend-dev:latest
+    build:
+      context: ../..
+      dockerfile: docker/dev/Dockerfile.frontend
+    container_name: bluebolt-frontend-dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: http://localhost:${PORT:-4001}/api
+      VITE_API_TIMEOUT: 30000
+    ports:
+      - "${FRONTEND_PORT:-4000}:${FRONTEND_PORT:-4000}"
+    volumes:
+      - ../../src:/app/src
+      - ../../public:/app/public
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - bluebolt-network-dev
+    command: npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT:-4000}
+
+volumes:
+  backend_uploads_dev:
+
+networks:
+  bluebolt-network-dev:
+    driver: bridge
