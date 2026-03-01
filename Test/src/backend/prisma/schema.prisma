@@ -275,6 +275,9 @@ model PaymentMethod {
   name         String        @unique
   type         String?       @map("type")
   accountInfo  String?       @map("account_info")
+  owner        String?       @map("owner")
+  buName       String?       @map("bu_name")
+  balance      Float         @default(0) @map("balance")
   status       String        @default("active") @map("status")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")

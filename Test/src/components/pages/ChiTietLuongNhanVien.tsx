@@ -3,7 +3,7 @@ import {
     User, ShieldCheck,
     Edit3, Calculator,
     History, X, Briefcase, CheckCircle2,
-    DollarSign, Building2, Award, FileText, Save, RotateCcw, Plus
+    Banknote, Building2, Award, FileText, Save, RotateCcw, Plus
 } from 'lucide-react';
 import { SalaryConfig, calculateSalaryRates } from '../../services/salaryConfigService';
 import { employeeService } from '../../services/employeeService';
@@ -298,7 +298,7 @@ export function ChiTietLuongNhanVien({ employee, config, onClose, onUpdate }: Ch
                                         <div className={`ml-2 p-3 border rounded-xl flex-1 flex justify-between items-center transition-all ${isActive ? 'border-blue-100 bg-white shadow-sm' : 'border-slate-50 bg-slate-50/30 opacity-70'}`}>
                                             <div>
                                                 <div className="flex items-center gap-2 font-bold text-[14px] text-gray-800">
-                                                    <DollarSign className={`w-3.5 h-3.5 ${isActive ? 'text-green-500' : 'text-gray-400'}`} /> {formatCurrency(item.salary)}
+                                                    <Banknote className={`w-3.5 h-3.5 ${isActive ? 'text-green-500' : 'text-gray-400'}`} /> {formatCurrency(item.salary)}
                                                 </div>
                                                 {item.description && <p className="text-[11px] text-gray-500 mt-0.5 font-medium">{item.description}</p>}
                                             </div>

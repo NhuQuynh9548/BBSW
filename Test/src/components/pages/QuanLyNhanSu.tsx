@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Eye, Edit2, Trash2, Users, X, AlertCircle, ChevronLeft, ChevronRight, Save, Mail, Phone, Calendar, MapPin, CreditCard, RotateCcw, DollarSign } from 'lucide-react';
+import {
+  Search, Plus, Eye, Edit2, Trash2, DollarSign, X, AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Save, Calendar, Building2, UserCircle2, Briefcase, Banknote,
+  GraduationCap, ClipboardList, Info, Trash, Clock, RotateCcw, Mail, Phone, MapPin, CreditCard, Users
+} from 'lucide-react';
 import { useDraggableColumns, DraggableColumnHeader, ColumnConfig } from '../hooks/useDraggableColumns';
 import { useApp } from '../../contexts/AppContext';
 import { employeeService } from '../../services/employeeService';
@@ -1016,11 +1019,11 @@ export function QuanLyNhanSu() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase flex items-center gap-2">
-                            <DollarSign className="w-4 h-4" />
+                            <Banknote className="w-4 h-4" />
                             Lương Thực Nhận
                           </label>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                             <input
                               type="number"
                               value={formData.actualSalary}

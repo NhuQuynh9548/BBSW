@@ -139,6 +139,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           label: 'Cấu hình lương',
           icon: <DollarSign className="w-4 h-4" />,
           path: '/master/cau-hinh-luong'
+        },
+        {
+          id: 'master-account',
+          label: 'Quản lý tài khoản',
+          icon: <Wallet className="w-4 h-4" />,
+          path: '/master/tai-khoan'
         }
       ]
     }

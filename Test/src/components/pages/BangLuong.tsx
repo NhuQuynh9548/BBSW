@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-    Search, DollarSign, Download, Filter,
+    Search, Banknote, Download, Filter,
     ChevronLeft, ChevronRight, Calculator,
     User, Building2, Calendar, LayoutGrid,
     ArrowUpRight, Users, Briefcase, FileText,
@@ -138,7 +138,7 @@ export function BangLuong() {
                 <div>
                     <h1 className="text-3xl font-black text-gray-800 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-[#004aad] rounded-xl shadow-lg shadow-blue-100">
-                            <DollarSign className="w-6 h-6 text-white" />
+                            <Banknote className="w-6 h-6 text-white" />
                         </div>
                         Bảng Lương Nhân Viên
                     </h1>

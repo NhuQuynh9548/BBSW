@@ -122,6 +122,7 @@ export function QuanLyThuChi() {
   const [filterBU, setFilterBU] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
@@ -279,6 +280,7 @@ export function QuanLyThuChi() {
       if (filterBU !== 'all') apiFilters.buId = filterBU;
       if (filterType !== 'all') apiFilters.type = filterType;
       if (filterStatus !== 'all') apiFilters.status = filterStatus;
+      if (filterPaymentMethod !== 'all') apiFilters.paymentMethodId = filterPaymentMethod;
       // Date filters
       const range = getTransactionRange(timeRange);
       if (range) {
@@ -315,14 +317,27 @@ export function QuanLyThuChi() {
       setBusinessUnits(bus);
       setPaymentMethods(pms);
       setAllocationRules(rules);
-
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
       setError('Không thể tải dữ liệu thu chi');
     } finally {
       setLoading(false);
     }
-  }, [filterBU, filterType, filterStatus, timeRange, customStartDate, customEndDate]);
+  }, [filterBU, filterType, filterStatus, filterPaymentMethod, timeRange, customStartDate, customEndDate]);
+
+  // Handle URL redirect from Account Detail
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const pmId = params.get('paymentMethodId');
+    if (pmId) {
+      setFilterPaymentMethod(pmId);
+      // Optional: Clear the param after setting it
+      const newParams = new URLSearchParams(location.search);
+      newParams.delete('paymentMethodId');
+      const search = newParams.toString();
+      navigate(location.pathname + (search ? `?${search}` : ''), { replace: true });
+    }
+  }, [location.search, navigate]);
 
   // Sync filterBU with selectedBU from global context (header)
   useEffect(() => {
@@ -1229,11 +1244,22 @@ export function QuanLyThuChi() {
                   <option value="DRAFT">Nháp</option>
                   <option value="REJECTED">Từ chối</option>
                 </select>
+                <select
+                  value={filterPaymentMethod}
+                  onChange={e => setFilterPaymentMethod(e.target.value)}
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white min-w-[150px]"
+                >
+                  <option value="all">Tất cả tài khoản</option>
+                  {paymentMethods.map(pm => (
+                    <option key={pm.id} value={pm.id}>{pm.name}</option>
+                  ))}
+                </select>
                 <button
                   onClick={() => {
                     setSearchTerm('');
                     setFilterStatus('all');
                     setFilterType('all');
+                    setFilterPaymentMethod('all');
                     setFilterBU('all');
                     setTimeRange('MONTH');
                     setCustomStartDate('');

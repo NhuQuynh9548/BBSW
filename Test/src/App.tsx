@@ -25,6 +25,7 @@ import { CapBacNhanSu } from './components/pages/master/CapBacNhanSu';
 import { ChuyenMonVaiTro } from './components/pages/master/ChuyenMonVaiTro';
 import { CauHinhLuong } from './components/pages/master/CauHinhLuong';
 import { PhuongThucThanhToan } from './components/pages/master/PhuongThucThanhToan';
+import { QuanLyTaiKhoan } from './components/pages/master/QuanLyTaiKhoan';
 import { BangLuong } from './components/pages/BangLuong';
 import { ProfilePage } from './components/pages/ProfilePage';
 import { ChangePasswordPage } from './components/pages/ChangePasswordPage';
@@ -67,6 +68,7 @@ function AppLayout() {
             <Route path="/master/chuyen-mon" element={<ChuyenMonVaiTro />} />
             <Route path="/master/cau-hinh-luong" element={<CauHinhLuong />} />
             <Route path="/master/thanh-toan" element={<PhuongThucThanhToan />} />
+            <Route path="/master/tai-khoan" element={<QuanLyTaiKhoan />} />
 
             {/* User Profile Routes */}
             <Route path="/profile" element={<ProfilePage />} />
@@ -88,7 +90,7 @@ export default function App() {
               <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={<LoginPage />} />
-                
+
                 {/* Document Viewer - Public access for opening in new tabs */}
                 <Route path="/document-viewer" element={<DocumentViewer />} />
 
