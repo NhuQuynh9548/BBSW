@@ -27,7 +27,7 @@ interface Employee {
   idCard: string;
   address: string;
   actualSalary: number;
-  contractType: 'ctv' | 'chinh-thuc' | 'thuc-tap';
+  contractType: 'ctv' | 'chinh-thuc' | 'thuc-tap' | 'thu-viec';
   contractStartDate: string;
   contractEndDate: string;
 }
@@ -457,10 +457,14 @@ export function QuanLyNhanSu() {
         return (
           <td key={column.id} className={`py-4 px-6 whitespace-nowrap ${alignClass}`}>
             <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${employee.contractType === 'chinh-thuc' ? 'bg-blue-100 text-blue-700' :
-              employee.contractType === 'ctv' ? 'bg-orange-100 text-orange-700' : 'bg-purple-100 text-purple-700'
+                employee.contractType === 'ctv' ? 'bg-orange-100 text-orange-700' :
+                  employee.contractType === 'thu-viec' ? 'bg-teal-100 text-teal-700' :
+                    'bg-purple-100 text-purple-700'
               }`}>
               {employee.contractType === 'chinh-thuc' ? 'Chính thức' :
-                employee.contractType === 'ctv' ? 'Cộng tác viên' : 'Thực tập sinh'}
+                employee.contractType === 'ctv' ? 'Cộng tác viên' :
+                  employee.contractType === 'thu-viec' ? 'Thử việc' :
+                    'Thực tập sinh'}
             </span>
           </td>
         );
@@ -1045,6 +1049,7 @@ export function QuanLyNhanSu() {
                             className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#004aad] focus:border-transparent focus:bg-white transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-semibold"
                           >
                             <option value="chinh-thuc">Nhân viên chính thức</option>
+                            <option value="thu-viec">Thử việc</option>
                             <option value="ctv">Cộng tác viên</option>
                             <option value="thuc-tap">Thực tập sinh</option>
                           </select>

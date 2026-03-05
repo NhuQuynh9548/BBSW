@@ -101,6 +101,36 @@ const chamCongService = {
             headers: { 'Content-Type': 'multipart/form-data' },
         }).then(r => r.data);
     },
+
+    // Download Excel template (pre-filled with employees + styled)
+    downloadTemplate: async (kyId: string, fileName: string): Promise<void> => {
+        const res = await api.get(`/cham-cong/import-template/${kyId}`, { responseType: 'blob' });
+        const url = URL.createObjectURL(new Blob([res.data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    },
+
+    // Export Excel (styled, from backend)
+    exportExcel: async (kyId: string, fileName: string): Promise<void> => {
+        const res = await api.get(`/cham-cong/export/${kyId}`, { responseType: 'blob' });
+        const url = URL.createObjectURL(new Blob([res.data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    },
 };
 
 export default chamCongService;

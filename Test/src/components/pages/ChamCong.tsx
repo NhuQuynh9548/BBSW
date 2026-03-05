@@ -94,7 +94,7 @@ function TaoKyModal({ onClose, onSave }: { onClose: () => void; onSave: (ky: KyC
 }
 
 // ===== MODAL IMPORT EXCEL =====
-function ImportModal({ kyId, onClose, onSuccess }: { kyId: string; onClose: () => void; onSuccess: () => void }) {
+function ImportModal({ kyId, kyEndDate, onClose, onSuccess }: { kyId: string; kyEndDate: string; onClose: () => void; onSuccess: () => void }) {
     const [file, setFile] = useState<File | null>(null);
     const [ghiDe, setGhiDe] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -160,16 +160,32 @@ function ImportModal({ kyId, onClose, onSuccess }: { kyId: string; onClose: () =
                         </div>
 
                         <div className="bg-blue-50 rounded-xl p-3 mb-4 text-xs text-blue-700 space-y-1">
-                            <p className="font-semibold">📋 Cấu trúc file Excel:</p>
-                            <p>• Hàng 1: Header (Mã NV, Họ tên, 1, 2, 3, ... [số ngày trong tháng])</p>
-                            <p>• Cột ngày: header là số nguyên (1-31)</p>
-                            <p>• Giá trị ô: mã công viết hoa (X, P, KL, NB...)</p>
+                            <p className="font-semibold">📋 Cấu trúc file Excel (mẫu mới):</p>
+                            <p>• Dòng 1: Tiêu đề "BẢNG CHẤM CÔNG THÁNG..."</p>
+                            <p>• Dòng 2: Kỳ thời gian (Từ ngày ... đến ngày ...)</p>
+                            <p>• Dòng 3: Mã NV | Họ tên | Số ngày (1, 2, 3...) | Cột tổng</p>
+                            <p>• Dòng 4: Thứ tương ứng (T2, T3...T7, CN)</p>
+                            <p>• Dòng 5+: Dữ liệu từng nhân viên, ô ngày điền mã công viết hoa (X, P, KL...)</p>
                         </div>
 
                         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-4">
                             <input type="checkbox" checked={ghiDe} onChange={e => setGhiDe(e.target.checked)} className="w-4 h-4 text-blue-600 rounded" />
                             <span>Ghi đè dữ liệu cũ (xóa toàn bộ chi tiết hiện tại trước khi import)</span>
                         </label>
+
+                        <div className="flex gap-2 mb-3">
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const end = new Date(kyEndDate);
+                                        const m = String(end.getMonth() + 1).padStart(2, '0');
+                                        await chamCongService.downloadTemplate(kyId, `Mau_Cham_Cong_T${m}_${end.getFullYear()}.xlsx`);
+                                    } catch { }
+                                }}
+                                className="flex-1 flex items-center justify-center gap-1.5 border border-green-400 text-green-700 bg-green-50 rounded-lg py-2 text-sm font-medium hover:bg-green-100 transition-colors">
+                                ↓ Tải file mẫu
+                            </button>
+                        </div>
 
                         <div className="flex gap-2">
                             <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm font-medium hover:bg-gray-50">Hủy</button>
@@ -385,20 +401,27 @@ export function ChamCong() {
         return () => clearTimeout(t);
     }, [search]);
 
+    const fetchDsMa = useCallback(() => {
+        chamCongService.getMaChamCong().then(setDsMa).catch(console.error);
+    }, []);
+
     // Load kỳ và mã
     useEffect(() => {
         chamCongService.getDanhSachKy().then(data => {
             setDanhSachKy(data);
             if (data.length > 0) setSelectedKy(data[0]);
         });
-        chamCongService.getMaChamCong().then(setDsMa);
-    }, []);
+        fetchDsMa();
+    }, [fetchDsMa]);
 
     // Load tổng hợp khi đổi kỳ hoặc search. Sync NV mới trước khi nạp.
     useEffect(() => {
         if (!selectedKy) return;
         setLoading(true);
         const load = async () => {
+            // Cập nhật lại danh sách mã chấm công mới nhất phòng khi có thay đổi từ DB
+            fetchDsMa();
+
             // Bước 1: Sync NV mới vào kỳ (chỉ khi không có search filter)
             if (!debouncedSearch) {
                 await chamCongService.syncNhanVien(selectedKy.id).catch(() => { });
@@ -408,7 +431,7 @@ export function ChamCong() {
             setTongHop(data);
         };
         load().finally(() => setLoading(false));
-    }, [selectedKy, debouncedSearch]);
+    }, [selectedKy, debouncedSearch, fetchDsMa]);
 
     const showToast = (type: 'success' | 'error', msg: string) => {
         setToast({ type, msg });
@@ -457,25 +480,21 @@ export function ChamCong() {
         finally { setActionLoading(null); }
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
         if (!selectedKy || tongHop.length === 0) return;
-        const data = tongHop.map(th => ({
-            'Mã NV': th.employee.employeeId,
-            'Họ tên': th.employee.fullName,
-            'Công chuẩn': th.congChuan,
-            'Chính thức': th.congChinhThuc,
-            'Thử việc': th.congThuViec,
-            'Phép năm': th.phepNam,
-            'Không lương': th.khongLuong,
-            'Nghỉ lễ': th.nghiLe,
-            'Nghỉ bù': th.nghiBu,
-            'Vắng': th.vang,
-            'Tổng công tính lương': th.tongCongTinhLuong,
-        }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Tổng hợp');
-        XLSX.writeFile(wb, `cham-cong-${selectedKy.tenKy}.xlsx`);
+        setActionLoading('export');
+        try {
+            const end = new Date(selectedKy.ngayKetThuc);
+            const month = String(end.getMonth() + 1).padStart(2, '0');
+            const year = end.getFullYear();
+            const fileName = `Bang_Cham_Cong_T${month}_${year}.xlsx`;
+            await chamCongService.exportExcel(selectedKy.id, fileName);
+            showToast('success', `Đã xuất file ${fileName}`);
+        } catch {
+            showToast('error', 'Lỗi khi xuất Excel');
+        } finally {
+            setActionLoading(null);
+        }
     };
 
     const isLocked = selectedKy?.trangThai === 'da_khoa';
@@ -570,9 +589,9 @@ export function ChamCong() {
                             className="flex items-center gap-1.5 border border-gray-300 text-gray-700 bg-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-sm">
                             <Upload className="w-4 h-4" /> Import Excel
                         </button>
-                        <button onClick={handleExport} disabled={!selectedKy || tongHop.length === 0}
+                        <button onClick={handleExport} disabled={!selectedKy || tongHop.length === 0 || actionLoading === 'export'}
                             className="flex items-center gap-1.5 border border-gray-300 text-gray-700 bg-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-sm">
-                            <Download className="w-4 h-4" /> Xuất Excel
+                            <Download className="w-4 h-4" /> {actionLoading === 'export' ? 'Đang xuất...' : 'Xuất Excel'}
                         </button>
                         <button onClick={handleTinhCong} disabled={!selectedKy || isLocked || actionLoading === 'tinh-cong'}
                             className="flex items-center gap-1.5 bg-blue-600 text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-40 transition-colors shadow-sm">
@@ -653,22 +672,27 @@ export function ChamCong() {
                     </div>
                 ) : (
                     <div className="overflow-auto max-h-[calc(100vh-440px)]">
-                        <table className="w-full text-sm min-w-[900px]">
+                        <table className="w-full text-sm min-w-[1400px]">
                             <thead className="sticky top-0 z-10">
                                 <tr className="bg-gray-50 border-b border-gray-200">
                                     {[
-                                        ['Mã NV', 'w-24 text-left'],
-                                        ['Họ tên', 'min-w-[160px] text-left'],
-                                        ['C. chuẩn', 'w-24 text-center'],
-                                        ['Chính thức', 'w-24 text-center'],
-                                        ['Thử việc', 'w-24 text-center'],
-                                        ['Phép năm', 'w-24 text-center'],
-                                        ['K. lương', 'w-24 text-center'],
-                                        ['Nghỉ lễ', 'w-20 text-center'],
-                                        ['Nghỉ bù', 'w-20 text-center'],
-                                        ['Vắng', 'w-20 text-center'],
+                                        ['Mã NV', 'min-w-[100px] text-left'],
+                                        ['Họ tên', 'min-w-[200px] text-left'],
+                                        ['C. chuẩn', 'min-w-[100px] text-center'],
+                                        ['Chính thức', 'min-w-[100px] text-center'],
+                                        ['Thử việc', 'min-w-[100px] text-center'],
+                                        ['Công tác', 'min-w-[100px] text-center'],
+                                        ['Nghỉ lễ', 'min-w-[100px] text-center'],
+                                        ['Phép năm', 'min-w-[100px] text-center'],
+                                        ['Nghỉ bù', 'min-w-[100px] text-center'],
+                                        ['X/P', 'min-w-[90px] text-center'],
+                                        ['X/NB', 'min-w-[90px] text-center'],
+                                        ['X/KL', 'min-w-[90px] text-center'],
+                                        ['P/KL', 'min-w-[90px] text-center'],
+                                        ['K. lương', 'min-w-[100px] text-center'],
+                                        ['Vắng', 'min-w-[90px] text-center'],
                                     ].map(([label, cls]) => (
-                                        <th key={label} className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${cls}`}>
+                                        <th key={label} title={label} className={`px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${cls}`}>
                                             {label}
                                         </th>
                                     ))}
@@ -681,29 +705,39 @@ export function ChamCong() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 bg-white">
-                                {filteredSorted.map(th => (
-                                    <tr
-                                        key={th.id}
-                                        onClick={() => setSelectedNV(th)}
-                                        className="hover:bg-blue-50/50 cursor-pointer transition-colors"
-                                    >
-                                        <td className="px-4 py-2.5 font-mono text-xs text-gray-500 font-medium">{th.employee.employeeId}</td>
-                                        <td className="px-4 py-2.5 font-medium text-gray-800">{th.employee.fullName}</td>
-                                        <td className="px-4 py-2.5 text-center text-gray-600">{th.congChuan}</td>
-                                        <td className="px-4 py-2.5 text-center font-medium text-green-700">{th.congChinhThuc || <span className="text-gray-300">—</span>}</td>
-                                        <td className="px-4 py-2.5 text-center text-yellow-600">{th.congThuViec || <span className="text-gray-300">—</span>}</td>
-                                        <td className="px-4 py-2.5 text-center text-blue-600">{th.phepNam || <span className="text-gray-300">—</span>}</td>
-                                        <td className="px-4 py-2.5 text-center text-orange-600">{th.khongLuong || <span className="text-gray-300">—</span>}</td>
-                                        <td className="px-4 py-2.5 text-center text-purple-600">{th.nghiLe || <span className="text-gray-300">—</span>}</td>
-                                        <td className="px-4 py-2.5 text-center text-teal-600">{th.nghiBu || <span className="text-gray-300">—</span>}</td>
-                                        <td className="px-4 py-2.5 text-center text-red-500">{th.vang || <span className="text-gray-300">—</span>}</td>
-                                        <td className="px-4 py-2.5 text-center">
-                                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${th.tongCongTinhLuong > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                                                {th.tongCongTinhLuong}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {filteredSorted.map(th => {
+                                    const bd = (th as any).breakdown || {};
+                                    return (
+                                        <tr
+                                            key={th.id}
+                                            onClick={() => setSelectedNV(th)}
+                                            className="hover:bg-blue-50/50 cursor-pointer transition-colors"
+                                        >
+                                            <td className="px-4 py-3 font-mono text-sm text-gray-600 font-medium">{th.employee.employeeId}</td>
+                                            <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap text-sm">{th.employee.fullName}</td>
+                                            <td className="px-4 py-3 text-center text-gray-600 text-sm">{th.congChuan}</td>
+                                            <td className="px-4 py-3 text-center font-medium text-green-700 text-sm">{bd['X'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center text-yellow-600 text-sm">{bd['TV'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center text-amber-600 text-sm">{bd['CT'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center text-purple-600 text-sm">{bd['NL'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center text-blue-600 text-sm">{bd['P'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center text-teal-600 text-sm">{bd['NB'] || <span className="text-gray-300">—</span>}</td>
+
+                                            <td className="px-4 py-3 text-center text-blue-600 text-sm min-w-[90px] bg-blue-50/20" title="Nửa ngày làm + Nửa ngày phép">{bd['X/P'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center text-teal-600 text-sm min-w-[90px] bg-teal-50/20" title="Nửa ngày làm + Nửa ngày nghỉ bù">{bd['X/NB'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center text-orange-500 text-sm min-w-[90px] bg-orange-50/20" title="Nửa ngày làm + Nửa ngày không lương">{bd['X/KL'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center text-pink-600 text-sm min-w-[90px] bg-pink-50/20" title="Nửa ngày phép + Nửa ngày không lương">{bd['P/KL'] || <span className="text-gray-300">—</span>}</td>
+
+                                            <td className="px-4 py-3 text-center text-orange-600 text-sm">{bd['KL'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center text-red-500 text-sm">{bd['V'] || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${th.tongCongTinhLuong > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                    {th.tongCongTinhLuong}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -726,6 +760,7 @@ export function ChamCong() {
             {showImport && selectedKy && (
                 <ImportModal
                     kyId={selectedKy.id}
+                    kyEndDate={selectedKy.ngayKetThuc}
                     onClose={() => setShowImport(false)}
                     onSuccess={async () => {
                         const fresh = await chamCongService.getTongHop(selectedKy.id);

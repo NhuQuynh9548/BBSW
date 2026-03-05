@@ -3,6 +3,7 @@ import prisma from '../utils/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 const router = Router();
 router.use(authenticate);
@@ -112,6 +113,36 @@ function isNgayLe(date: Date): boolean {
 function isNghiCuoiTuan(date: Date): boolean {
     const day = date.getDay();
     return day === 0 || day === 6; // 0 = CN, 6 = T7
+}
+
+// Hàm helper tính tổng hợp chấm công dựa trên danh sách chi tiết
+function tinhContributions(chiTietList: any[]) {
+    const data = { congChinhThuc: 0, congThuViec: 0, phepNam: 0, khongLuong: 0, nghiLe: 0, nghiBu: 0, vang: 0, tongCongTinhLuong: 0 };
+    chiTietList.forEach((ct: any) => {
+        if (!ct.maChamCong) return;
+        const loai = ct.maChamCong.loai;
+        const gia = ct.giaTriCong;
+        switch (loai) {
+            case 'chinh_thuc':
+            case 'cong_tac':
+                data.congChinhThuc += gia; data.tongCongTinhLuong += gia; break;
+            case 'thu_viec': data.congThuViec += gia; data.tongCongTinhLuong += gia; break;
+            case 'phep': data.phepNam += gia; data.tongCongTinhLuong += gia; break;
+            case 'khong_luong': data.khongLuong += gia; break;
+            case 'le': data.nghiLe += gia; data.tongCongTinhLuong += gia; break;
+            case 'nghi_bu': data.nghiBu += gia; data.tongCongTinhLuong += gia; break;
+            case 'bh_che_do': data.tongCongTinhLuong += gia; break; // Nghỉ chế độ không trừ lương
+            case 'vang': data.vang += gia; break;
+            case 'chinh_thuc_phep': data.congChinhThuc += 0.5; data.phepNam += 0.5; data.tongCongTinhLuong += 1; break;
+            case 'chinh_thuc_nghi_bu': data.congChinhThuc += 0.5; data.nghiBu += 0.5; data.tongCongTinhLuong += 1; break;
+            case 'chinh_thuc_khong_luong': data.congChinhThuc += 0.5; data.khongLuong += 0.5; data.tongCongTinhLuong += 0.5; break;
+            case 'phep_khong_luong': data.phepNam += 0.5; data.khongLuong += 0.5; data.tongCongTinhLuong += 0.5; break;
+            default:
+                if (ct.maChamCong.duocTinhLuong) data.tongCongTinhLuong += gia;
+                break;
+        }
+    });
+    return data;
 }
 
 // ===================== KỲ CHẤM CÔNG =====================
@@ -336,10 +367,189 @@ router.get('/tong-hop/:kyId', async (req: AuthRequest, res: Response) => {
             orderBy: { tongCongTinhLuong: 'desc' },
         });
 
-        res.json(tongHop);
+        // Fetch chi tiết chấm công để lấy breakdown
+        const allChiTiet = await (prisma as any).chiTietChamCong.findMany({
+            where: { kyId },
+            include: { maChamCong: true }
+        });
+
+        const breakdownByEmp: Record<string, Record<string, number>> = {};
+        allChiTiet.forEach((ct: any) => {
+            if (!ct.maChamCong) return;
+            const empId = ct.employeeId;
+            const ma = ct.maChamCong.ma;
+            if (!breakdownByEmp[empId]) breakdownByEmp[empId] = {};
+            breakdownByEmp[empId][ma] = (breakdownByEmp[empId][ma] || 0) + 1;
+        });
+
+        const result = tongHop.map((th: any) => ({
+            ...th,
+            breakdown: breakdownByEmp[th.employeeId] || {}
+        }));
+
+        res.json(result);
     } catch (error) {
         console.error('Get tong hop error:', error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/cham-cong/export/:kyId
+router.get('/export/:kyId', async (req: AuthRequest, res: Response) => {
+    try {
+        const { kyId } = req.params;
+        const ky = await (prisma as any).kyChamCong.findUnique({ where: { id: kyId } });
+        if (!ky) return res.status(404).json({ error: 'Kỳ không tồn tại' });
+
+        const start = new Date(ky.ngayBatDau);
+        const end = new Date(ky.ngayKetThuc);
+        const month = end.getMonth() + 1;
+        const year = end.getFullYear();
+
+        const formatDate = (d: Date) => {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+        };
+
+        const days: Date[] = [];
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            days.push(new Date(d));
+        }
+
+        const tongHop = await (prisma as any).tongHopChamCong.findMany({
+            where: { kyId },
+            include: { employee: true },
+            orderBy: { tongCongTinhLuong: 'desc' },
+        });
+
+        const allChiTiet = await (prisma as any).chiTietChamCong.findMany({
+            where: { kyId },
+            include: { maChamCong: true }
+        });
+
+        const chiTietByEmp: Record<string, Record<string, string>> = {};
+        allChiTiet.forEach((ct: any) => {
+            const dStr = new Date(ct.ngay).toISOString().split('T')[0];
+            if (!chiTietByEmp[ct.employeeId]) chiTietByEmp[ct.employeeId] = {};
+            chiTietByEmp[ct.employeeId][dStr] = ct.maChamCong?.ma || '';
+        });
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Bảng Chấm Công');
+
+        // Styles
+        const titleStyle = { font: { name: 'Times New Roman', size: 16, bold: true }, alignment: { horizontal: 'center' as const } };
+        const subtitleStyle = { font: { name: 'Times New Roman', size: 12, italic: true }, alignment: { horizontal: 'center' as const } };
+        const headerStyle = { font: { name: 'Times New Roman', size: 11, bold: true }, alignment: { horizontal: 'center' as const, vertical: 'middle' as const }, border: { top: { style: 'thin' as const }, left: { style: 'thin' as const }, bottom: { style: 'thin' as const }, right: { style: 'thin' as const } } };
+        const cellStyle = { font: { name: 'Times New Roman', size: 11 }, alignment: { horizontal: 'center' as const, vertical: 'middle' as const }, border: { top: { style: 'thin' as const }, left: { style: 'thin' as const }, bottom: { style: 'thin' as const }, right: { style: 'thin' as const } } };
+        const nameStyle = { ...cellStyle, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+        const weekendFill = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFD9EAD3' } }; // Light green
+
+        // Row 1: Title
+        ws.mergeCells(1, 1, 1, 2 + days.length + 5);
+        const titleCell = ws.getCell(1, 1);
+        titleCell.value = `BẢNG CHẤM CÔNG THÁNG ${month} NĂM ${year}`;
+        titleCell.style = titleStyle;
+
+        // Row 2: Subtitle
+        ws.mergeCells(2, 1, 2, 2 + days.length + 5);
+        const subtitleCell = ws.getCell(2, 1);
+        subtitleCell.value = `Từ ngày ${formatDate(start)} đến ngày ${formatDate(end)}`;
+        subtitleCell.style = subtitleStyle;
+
+        // Row 3: Header (Ngày)
+        const row3 = ws.getRow(3);
+        const row4 = ws.getRow(4);
+
+        row3.getCell(1).value = 'Mã NV';
+        row4.getCell(1).value = '';
+        ws.mergeCells(3, 1, 4, 1);
+        row3.getCell(1).style = headerStyle;
+
+        row3.getCell(2).value = 'Họ tên';
+        row4.getCell(2).value = '';
+        ws.mergeCells(3, 2, 4, 2);
+        row3.getCell(2).style = headerStyle;
+
+        days.forEach((d, idx) => {
+            const col = 3 + idx;
+            row3.getCell(col).value = d.getDate();
+            const thu = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][d.getDay()];
+            row4.getCell(col).value = thu;
+
+            row3.getCell(col).style = headerStyle;
+            row4.getCell(col).style = headerStyle;
+
+            if (d.getDay() === 0 || d.getDay() === 6) {
+                row3.getCell(col).fill = weekendFill;
+                row4.getCell(col).fill = weekendFill;
+            }
+        });
+
+        // Summary columns
+        const summaryHeaders = ['C.Chuẩn', 'TC.Làm', 'N.Lễ', 'P.Năm', 'Tổng TL'];
+        summaryHeaders.forEach((h, idx) => {
+            const col = 3 + days.length + idx;
+            row3.getCell(col).value = h;
+            row4.getCell(col).value = '';
+            ws.mergeCells(3, col, 4, col);
+            row3.getCell(col).style = headerStyle;
+        });
+
+        row3.height = 25;
+        row4.height = 25;
+
+        // Data rows
+        tongHop.forEach((th: any, idx: number) => {
+            const r = ws.getRow(5 + idx);
+            r.getCell(1).value = th.employee.employeeId;
+            r.getCell(1).style = cellStyle;
+
+            r.getCell(2).value = th.employee.fullName;
+            r.getCell(2).style = nameStyle;
+
+            days.forEach((d, dIdx) => {
+                const col = 3 + dIdx;
+                const dStr = d.toISOString().split('T')[0];
+                const code = chiTietByEmp[th.employeeId]?.[dStr] || '';
+                r.getCell(col).value = code;
+                r.getCell(col).style = cellStyle;
+
+                if (d.getDay() === 0 || d.getDay() === 6) {
+                    r.getCell(col).fill = weekendFill;
+                }
+            });
+
+            // Summary data
+            r.getCell(3 + days.length + 0).value = th.congChuan;
+            r.getCell(3 + days.length + 0).style = cellStyle;
+            r.getCell(3 + days.length + 1).value = th.congChinhThuc;
+            r.getCell(3 + days.length + 1).style = cellStyle;
+            r.getCell(3 + days.length + 2).value = th.nghiLe;
+            r.getCell(3 + days.length + 2).style = cellStyle;
+            r.getCell(3 + days.length + 3).value = th.phepNam;
+            r.getCell(3 + days.length + 3).style = cellStyle;
+            r.getCell(3 + days.length + 4).value = th.tongCongTinhLuong;
+            const highlightStyle = { ...cellStyle, font: { ...cellStyle.font, bold: true, color: { argb: 'FF0000FF' } } };
+            r.getCell(3 + days.length + 4).style = highlightStyle;
+        });
+
+        ws.getColumn(1).width = 12;
+        ws.getColumn(2).width = 25;
+        for (let i = 0; i < days.length; i++) {
+            ws.getColumn(3 + i).width = 5;
+        }
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="Bang_Cham_Cong_T${month}_${year}.xlsx"`);
+
+        await wb.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('Export Excel error:', error);
+        res.status(500).json({ error: 'Internal server error processing export' });
     }
 });
 
@@ -392,23 +602,8 @@ router.get('/chi-tiet/:kyId/:employeeId', async (req: AuthRequest, res: Response
 
         // Auto-recalc TongHop từ chiTiet thực tế (fix stale data khi xóa trực tiếp DB)
         const congChuan = ky.congChuan || 0;
-        const freshTongHop = {
-            congChuan,
-            congChinhThuc: 0, congThuViec: 0, phepNam: 0,
-            khongLuong: 0, nghiLe: 0, nghiBu: 0, vang: 0, tongCongTinhLuong: 0,
-        };
-        chiTiet.forEach((ct: any) => {
-            if (!ct.maChamCong) return;
-            const loai = ct.maChamCong.loai; const gia = ct.giaTriCong;
-            if (loai === 'chinh_thuc') freshTongHop.congChinhThuc += gia;
-            else if (loai === 'thu_viec') freshTongHop.congThuViec += gia;
-            else if (loai === 'phep') freshTongHop.phepNam += gia;
-            else if (loai === 'khong_luong') freshTongHop.khongLuong += gia;
-            else if (loai === 'le') freshTongHop.nghiLe += gia;
-            else if (loai === 'nghi_bu') freshTongHop.nghiBu += gia;
-            else if (loai === 'vang') freshTongHop.vang += gia;
-            if (ct.maChamCong.duocTinhLuong) freshTongHop.tongCongTinhLuong += gia;
-        });
+        const agg = tinhContributions(chiTiet);
+        const freshTongHop = { congChuan, ...agg };
         await (prisma as any).tongHopChamCong.upsert({
             where: { kyId_employeeId: { kyId, employeeId } },
             update: freshTongHop,
@@ -468,19 +663,8 @@ router.post('/reset-tong-hop/:kyId', async (req: AuthRequest, res: Response) => 
         });
 
         for (const [employeeId, chiTiets] of Object.entries(byEmployee)) {
-            const data: any = { congChuan, congChinhThuc: 0, congThuViec: 0, phepNam: 0, khongLuong: 0, nghiLe: 0, nghiBu: 0, vang: 0, tongCongTinhLuong: 0 };
-            (chiTiets as any[]).forEach((ct: any) => {
-                if (!ct.maChamCong) return;
-                const loai = ct.maChamCong.loai; const gia = ct.giaTriCong;
-                if (loai === 'chinh_thuc') data.congChinhThuc += gia;
-                else if (loai === 'thu_viec') data.congThuViec += gia;
-                else if (loai === 'phep') data.phepNam += gia;
-                else if (loai === 'khong_luong') data.khongLuong += gia;
-                else if (loai === 'le') data.nghiLe += gia;
-                else if (loai === 'nghi_bu') data.nghiBu += gia;
-                else if (loai === 'vang') data.vang += gia;
-                if (ct.maChamCong.duocTinhLuong) data.tongCongTinhLuong += gia;
-            });
+            const agg = tinhContributions(chiTiets as any[]);
+            const data: any = { congChuan, ...agg };
             await (prisma as any).tongHopChamCong.updateMany({ where: { kyId, employeeId }, data });
         }
 
@@ -527,30 +711,7 @@ router.put('/chi-tiet', async (req: AuthRequest, res: Response) => {
             include: { maChamCong: true },
         });
 
-        const tongHopData = {
-            congChinhThuc: 0,
-            congThuViec: 0,
-            phepNam: 0,
-            khongLuong: 0,
-            nghiLe: 0,
-            nghiBu: 0,
-            vang: 0,
-            tongCongTinhLuong: 0,
-        };
-
-        allChiTiet.forEach((ct: any) => {
-            if (!ct.maChamCong) return;
-            const loaiCt = ct.maChamCong.loai;
-            const gia = ct.giaTriCong;
-            if (loaiCt === 'chinh_thuc') tongHopData.congChinhThuc += gia;
-            else if (loaiCt === 'thu_viec') tongHopData.congThuViec += gia;
-            else if (loaiCt === 'phep') tongHopData.phepNam += gia;
-            else if (loaiCt === 'khong_luong') tongHopData.khongLuong += gia;
-            else if (loaiCt === 'le') tongHopData.nghiLe += gia;
-            else if (loaiCt === 'nghi_bu') tongHopData.nghiBu += gia;
-            else if (loaiCt === 'vang') tongHopData.vang += gia;
-            if (ct.maChamCong.duocTinhLuong) tongHopData.tongCongTinhLuong += gia;
-        });
+        const tongHopData = tinhContributions(allChiTiet);
 
         await (prisma as any).tongHopChamCong.upsert({
             where: { kyId_employeeId: { kyId, employeeId } },
@@ -566,6 +727,113 @@ router.put('/chi-tiet', async (req: AuthRequest, res: Response) => {
 });
 
 // ===================== IMPORT EXCEL =====================
+
+// GET /api/cham-cong/import-template/:kyId — Tải file mẫu
+router.get('/import-template/:kyId', async (req: AuthRequest, res: Response) => {
+    try {
+        const { kyId } = req.params;
+        const ky = await (prisma as any).kyChamCong.findUnique({ where: { id: kyId } });
+        if (!ky) return res.status(404).json({ error: 'Kỳ không tồn tại' });
+
+        const start = new Date(ky.ngayBatDau);
+        const end = new Date(ky.ngayKetThuc);
+        const month = end.getMonth() + 1;
+        const year = end.getFullYear();
+
+        const fmtDate = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+
+        const days: Date[] = [];
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) days.push(new Date(d));
+
+        const employees = await prisma.employee.findMany({
+            select: { employeeId: true, fullName: true },
+            orderBy: { employeeId: 'asc' }
+        });
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Bảng Chấm Công');
+
+        const hdrStyle = { font: { name: 'Times New Roman', size: 11, bold: true }, alignment: { horizontal: 'center' as const, vertical: 'middle' as const }, border: { top: { style: 'thin' as const }, left: { style: 'thin' as const }, bottom: { style: 'thin' as const }, right: { style: 'thin' as const } } };
+        const cellStyle = { font: { name: 'Times New Roman', size: 11 }, alignment: { horizontal: 'center' as const, vertical: 'middle' as const }, border: { top: { style: 'thin' as const }, left: { style: 'thin' as const }, bottom: { style: 'thin' as const }, right: { style: 'thin' as const } } };
+        const nameStyle = { ...cellStyle, alignment: { horizontal: 'left' as const, vertical: 'middle' as const } };
+        const weekendFill = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFD9EAD3' } };
+        const summaryHeaders = ['C.Chuẩn', 'TC.Làm', 'Công TV', 'WFH', 'Phép Năm', 'Nghỉ KL', 'Nghỉ Chế Độ', 'Nghỉ Bù', 'TC Lễ', 'TC Cuối Tuần', 'Nghỉ Ốm', 'Thai Sản', 'Tổng TL'];
+
+        const totalCols = 2 + days.length + summaryHeaders.length;
+
+        // Row 1: Title
+        ws.mergeCells(1, 1, 1, totalCols);
+        const r1 = ws.getCell(1, 1);
+        r1.value = `BẢNG CHẤM CÔNG THÁNG ${month} NĂM ${year}`;
+        r1.style = { font: { name: 'Times New Roman', size: 16, bold: true }, alignment: { horizontal: 'center' as const } };
+        ws.getRow(1).height = 30;
+
+        // Row 2: Subtitle
+        ws.mergeCells(2, 1, 2, totalCols);
+        const r2 = ws.getCell(2, 1);
+        r2.value = `Từ ngày ${fmtDate(start)} đến ngày ${fmtDate(end)}`;
+        r2.style = { font: { name: 'Times New Roman', size: 12, italic: true }, alignment: { horizontal: 'center' as const } };
+
+        // Row 3: Mã NV | Họ tên | date numbers | summary labels
+        const row3 = ws.getRow(3);
+        const row4 = ws.getRow(4);
+
+        row3.getCell(1).value = 'Mã NV'; row3.getCell(1).style = hdrStyle;
+        row4.getCell(1).value = ''; ws.mergeCells(3, 1, 4, 1);
+
+        row3.getCell(2).value = 'Họ Tên'; row3.getCell(2).style = hdrStyle;
+        row4.getCell(2).value = ''; ws.mergeCells(3, 2, 4, 2);
+
+        days.forEach((d, i) => {
+            const col = 3 + i;
+            const thu = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][d.getDay()];
+            row3.getCell(col).value = d.getDate(); row3.getCell(col).style = hdrStyle;
+            row4.getCell(col).value = thu; row4.getCell(col).style = hdrStyle;
+            if (d.getDay() === 0 || d.getDay() === 6) {
+                row3.getCell(col).fill = weekendFill;
+                row4.getCell(col).fill = weekendFill;
+            }
+        });
+
+        summaryHeaders.forEach((h, i) => {
+            const col = 3 + days.length + i;
+            row3.getCell(col).value = h; row3.getCell(col).style = hdrStyle;
+            row4.getCell(col).value = ''; ws.mergeCells(3, col, 4, col);
+        });
+
+        row3.height = 25; row4.height = 25;
+
+        // Data rows
+        employees.forEach((emp, i) => {
+            const r = ws.getRow(5 + i);
+            r.getCell(1).value = emp.employeeId; r.getCell(1).style = cellStyle;
+            r.getCell(2).value = emp.fullName; r.getCell(2).style = nameStyle;
+            days.forEach((d, dIdx) => {
+                const col = 3 + dIdx;
+                r.getCell(col).value = '';
+                r.getCell(col).style = cellStyle;
+                if (d.getDay() === 0 || d.getDay() === 6) r.getCell(col).fill = weekendFill;
+            });
+            summaryHeaders.forEach((_, si) => {
+                const col = 3 + days.length + si;
+                r.getCell(col).style = { ...cellStyle, font: { ...cellStyle.font, bold: si === summaryHeaders.length - 1, color: si === summaryHeaders.length - 1 ? { argb: 'FF0000FF' } : { argb: 'FF000000' } } };
+            });
+        });
+
+        ws.getColumn(1).width = 12;
+        ws.getColumn(2).width = 25;
+        for (let i = 0; i < days.length; i++) ws.getColumn(3 + i).width = 5;
+        summaryHeaders.forEach((_, i) => { ws.getColumn(3 + days.length + i).width = 12; });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="Mau_Cham_Cong_T${month}_${year}.xlsx"`);
+        await wb.xlsx.write(res);
+        res.end();
+    } catch (err) {
+        console.error('Template error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 // POST /api/cham-cong/import/:kyId
 router.post('/import/:kyId', upload.single('file'), async (req: AuthRequest, res: Response) => {
@@ -585,11 +853,18 @@ router.post('/import/:kyId', upload.single('file'), async (req: AuthRequest, res
 
         if (rows.length < 2) return res.status(400).json({ error: 'File trống hoặc không đúng định dạng' });
 
-        const headerRow: any[] = rows[0];
+        // --- Phát hiện định dạng mới (tiêu đề ở dòng 0-1, ngày ở dòng 2, thứ ở dòng 3, dữ liệu từ dòng 4)
+        const firstCellStr = String(rows[0]?.[0] || '').toUpperCase().trim();
+        const isNewFormat = firstCellStr.includes('BẢNG CHẤM CÔNG') || firstCellStr.includes('BANG CHAM CONG');
+        const dateRowIdx = isNewFormat ? 2 : 0;
+        const dataStartIdx = isNewFormat ? 4 : 1;
+
+        const headerRow: any[] = rows[dateRowIdx];
 
         // Debug log
-        console.log('[IMPORT] Header:', headerRow);
-        console.log('[IMPORT] Rows count:', rows.length - 1, '| Sample row 1:', rows[1]);
+        console.log('[IMPORT] Format:', isNewFormat ? 'new (4 header rows)' : 'old (1 header row)');
+        console.log('[IMPORT] DateRow:', headerRow);
+        console.log('[IMPORT] Rows count:', rows.length - dataStartIdx, '| Sample:', rows[dataStartIdx]);
 
         // ---- Dò cột Mã NV ----
         function normalizeStr(s: string): string {
@@ -605,12 +880,12 @@ router.post('/import/:kyId', upload.single('file'), async (req: AuthRequest, res
         // Fallback: scan sample rows xem cột nào có dạng mã NV (chữ + số)
         if (maNVColIdx === -1) {
             for (let c = 0; c < Math.min(4, headerRow.length); c++) {
-                const sample = String(rows[1]?.[c] || '').trim();
+                const sample = String(rows[dataStartIdx]?.[c] || '').trim();
                 if (/^[A-Za-z]{1,4}\d{2,5}$/.test(sample)) { maNVColIdx = c; break; }
             }
         }
-        // Cuối cùng: dùng cột 1 làm mặc định (sau cột STT)
-        if (maNVColIdx === -1) maNVColIdx = 1;
+        // Cuối cùng: dùng cột 0 làm mặc định
+        if (maNVColIdx === -1) maNVColIdx = 0;
         console.log('[IMPORT] maNVColIdx =', maNVColIdx, '| header value:', headerRow[maNVColIdx]);
 
         // ---- Dò cột ngày (header là số 1-31) ----
@@ -664,7 +939,7 @@ router.post('/import/:kyId', upload.single('file'), async (req: AuthRequest, res
         const startDate = new Date(ky.ngayBatDau);
         const endDate = new Date(ky.ngayKetThuc);
 
-        for (let rIdx = 1; rIdx < rows.length; rIdx++) {
+        for (let rIdx = dataStartIdx; rIdx < rows.length; rIdx++) {
             const row = rows[rIdx];
             const maNV = String(row[maNVColIdx] || '').toUpperCase().trim();
             if (!maNV) continue;
