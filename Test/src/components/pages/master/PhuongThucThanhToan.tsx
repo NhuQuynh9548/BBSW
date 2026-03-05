@@ -292,8 +292,8 @@ export function PhuongThucThanhToan() {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-2xl">
             <div className="border-b border-gray-200 px-6 py-5">
               <div className="flex items-start justify-between">
                 <div>
@@ -413,8 +413,8 @@ export function PhuongThucThanhToan() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && deletingMethod && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-md">
             <div className="p-6">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">

@@ -460,8 +460,8 @@ export function QuanLyBU() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-md p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-4">Xác Nhận Xóa</h3>
             <p className="text-gray-600 mb-6">Bạn có chắc chắn muốn xóa Business Unit này?</p>
             <div className="flex justify-end gap-3">
@@ -484,8 +484,8 @@ export function QuanLyBU() {
 
       {/* Add/Edit Modal - Centered Popup */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-2xl">
             {/* Modal Header */}
             <div className="border-b border-gray-200 px-6 py-5">
               <div className="flex items-start justify-between">

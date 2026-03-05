@@ -21,7 +21,9 @@ import {
   Award,
   UserCog,
   CreditCard,
-  ClipboardList
+  ClipboardList,
+  CalendarCheck,
+  Calculator
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 
@@ -66,7 +68,26 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       id: 'nhan-su',
       label: 'Quản Lý Nhân Sự',
       icon: <Users className="w-5 h-5" />,
-      path: '/quan-ly-nhan-su'
+      children: [
+        {
+          id: 'nhan-su-danh-sach',
+          label: 'Danh sách nhân sự',
+          icon: <Users className="w-4 h-4" />,
+          path: '/quan-ly-nhan-su'
+        },
+        {
+          id: 'nhan-su-cham-cong',
+          label: 'Chấm công',
+          icon: <CalendarCheck className="w-4 h-4" />,
+          path: '/nhan-su/cham-cong'
+        },
+        {
+          id: 'nhan-su-tinh-luong',
+          label: 'Quản lý tính lương',
+          icon: <Calculator className="w-4 h-4" />,
+          path: '/nhan-su/tinh-luong'
+        }
+      ]
     },
     {
       id: 'doi-tac',

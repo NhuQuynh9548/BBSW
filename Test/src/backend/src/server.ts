@@ -23,6 +23,8 @@ import settingRoutes from './routes/settings';
 import notificationRoutes from './routes/notifications';
 import auditLogRoutes from './routes/auditLogs';
 import salaryConfigRoutes from './routes/salaryConfigs';
+import chamCongRoutes from './routes/chamCong';
+import salaryRecordsRoutes from './routes/salaryRecords';
 import path from 'path';
 
 // Load environment variables
@@ -59,6 +61,8 @@ app.use('/api/settings', settingRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/salary-configs', salaryConfigRoutes);
+app.use('/api/cham-cong', chamCongRoutes);
+app.use('/api/salary-records', salaryRecordsRoutes);
 
 // Swagger API Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

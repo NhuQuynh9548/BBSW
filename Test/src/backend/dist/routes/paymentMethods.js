@@ -13,9 +13,23 @@ router.get('/', async (req, res) => {
     try {
         const paymentMethods = await prisma_1.default.paymentMethod.findMany({
             orderBy: { name: 'asc' },
-            include: { _count: { select: { transactions: true, partners: true } } }
+            include: {
+                _count: { select: { transactions: true, partners: true } },
+                transactions: { select: { amount: true } }
+            }
         });
-        res.json(paymentMethods);
+        // Compute current balance = opening_balance - SUM(all linked transactions)
+        const result = paymentMethods.map((pm) => {
+            const totalTransactions = pm.transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+            const currentBalance = (pm.openingBalance || 0) - totalTransactions;
+            return {
+                ...pm,
+                transactions: undefined, // don't expose raw transactions list here
+                balance: currentBalance,
+                openingBalance: pm.openingBalance || 0,
+            };
+        });
+        res.json(result);
     }
     catch (error) {
         console.error('Get payment methods error:', error);
@@ -25,8 +39,13 @@ router.get('/', async (req, res) => {
 // POST /api/payment-methods
 router.post('/', async (req, res) => {
     try {
+        const { openingBalance, ...rest } = req.body;
         const paymentMethod = await prisma_1.default.paymentMethod.create({
-            data: req.body
+            data: {
+                ...rest,
+                openingBalance: openingBalance || 0,
+                balance: openingBalance || 0, // initial balance = opening balance
+            }
         });
         res.status(201).json(paymentMethod);
     }
@@ -38,9 +57,14 @@ router.post('/', async (req, res) => {
 // PUT /api/payment-methods/:id
 router.put('/:id', async (req, res) => {
     try {
+        const { openingBalance, ...rest } = req.body;
+        const data = { ...rest };
+        if (openingBalance !== undefined) {
+            data.openingBalance = openingBalance;
+        }
         const paymentMethod = await prisma_1.default.paymentMethod.update({
             where: { id: req.params.id },
-            data: req.body
+            data
         });
         res.json(paymentMethod);
     }

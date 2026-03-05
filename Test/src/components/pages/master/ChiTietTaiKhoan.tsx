@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     Edit2,
     Lock,
+    Unlock,
     X,
     Briefcase,
     TrendingUp,
@@ -13,7 +14,12 @@ import {
     Vault,
     Wallet,
     Calculator,
-    History as HistoryIcon
+    History as HistoryIcon,
+    CreditCard,
+    CheckCircle,
+    XCircle,
+    Calendar,
+    User as UserIcon
 } from 'lucide-react';
 import { transactionService } from '../../../services/transactionService';
 
@@ -49,20 +55,31 @@ const formatCurrency = (val: number) => {
 
 const getTypeIcon = (type: string) => {
     switch (type) {
-        case 'Ngân hàng': return <Landmark className="w-6 h-6 text-[#004aad]" />;
-        case 'Tiền mặt': return <Vault className="w-6 h-6 text-[#004aad]" />;
-        case 'Ví điện tử': return <Wallet className="w-6 h-6 text-[#004aad]" />;
-        case 'Thẻ tín dụng': return <Edit2 className="w-6 h-6 text-[#004aad]" />;
-        default: return <Landmark className="w-6 h-6 text-[#004aad]" />;
+        case 'Ngân hàng': return <Landmark className="w-5 h-5" />;
+        case 'Tiền mặt': return <Vault className="w-5 h-5" />;
+        case 'Ví điện tử': return <Wallet className="w-5 h-5" />;
+        case 'Thẻ tín dụng': return <CreditCard className="w-5 h-5" />;
+        default: return <Landmark className="w-5 h-5" />;
+    }
+};
+
+const getTypeColor = (type: string) => {
+    switch (type) {
+        case 'Ngân hàng': return 'bg-blue-50 text-blue-600 border-blue-100';
+        case 'Tiền mặt': return 'bg-green-50 text-green-600 border-green-100';
+        case 'Ví điện tử': return 'bg-purple-50 text-purple-600 border-purple-100';
+        case 'Thẻ tín dụng': return 'bg-orange-50 text-orange-600 border-orange-100';
+        default: return 'bg-blue-50 text-blue-600 border-blue-100';
     }
 };
 
 const getTransactionTypeIcon = (type: string) => {
     switch (type) {
-        case 'INCOME': return <TrendingUp className="w-3 h-3 text-green-500" />;
-        case 'EXPENSE': return <TrendingDown className="w-3 h-3 text-red-500" />;
-        case 'TRANSFER': return <ArrowRightLeft className="w-3 h-3 text-blue-500" />;
-        default: return <DollarSign className="w-3 h-3 text-gray-400" />;
+        case 'INCOME': return <TrendingUp className="w-3.5 h-3.5 text-green-500" />;
+        case 'EXPENSE': return <TrendingDown className="w-3.5 h-3.5 text-red-500" />;
+        case 'TRANSFER': return <ArrowRightLeft className="w-3.5 h-3.5 text-blue-500" />;
+        case 'LOAN': return <DollarSign className="w-3.5 h-3.5 text-blue-400" />;
+        default: return <DollarSign className="w-3.5 h-3.5 text-gray-400" />;
     }
 };
 
@@ -71,8 +88,19 @@ const getTransactionTypeLabel = (type: string) => {
         case 'INCOME': return 'THU';
         case 'EXPENSE': return 'CHI';
         case 'TRANSFER': return 'DI CHUYỂN';
+        case 'LOAN': return 'VAY';
         default: return type;
     }
+};
+
+// Trả về số tiền có dấu theo loại giao dịch:
+// THU → dương (+), CHI → âm (-), VAY → null (không tính)
+const getSignedAmount = (txn: any): number | null => {
+    const type = txn.transactionType;
+    const amount = Math.abs(txn.amount || 0);
+    if (type === 'INCOME') return amount;
+    if (type === 'EXPENSE') return -amount;
+    return null; // VAY / LOAN không tính vào
 };
 
 const getObjectName = (txn: any) => {
@@ -98,16 +126,12 @@ export function ChiTietTaiKhoan({ account: initialAccount, onClose, onEdit, onTo
     const [account, setAccount] = useState<Account>(initialAccount);
     const [showAllTransactions, setShowAllTransactions] = useState(false);
 
-    const handleViewAllTransactions = () => {
-        setShowAllTransactions(!showAllTransactions);
-    };
-
     useEffect(() => {
         const enrichedAccount = {
             ...initialAccount,
             bankName: initialAccount.bankName || (initialAccount.type === 'Ngân hàng' ? 'Techcombank' : 'N/A'),
             branch: initialAccount.branch || (initialAccount.type === 'Ngân hàng' ? 'Chi nhánh Hà Nội' : 'N/A'),
-            openingBalance: initialAccount.openingBalance || 100000000,
+            openingBalance: initialAccount.openingBalance ?? 0,
             createdAt: initialAccount.createdAt || '2023-01-15',
             createdBy: initialAccount.createdBy || 'Admin',
             description: initialAccount.description || 'Tài khoản dùng cho hoạt động kinh doanh chính của công ty.'
@@ -120,7 +144,6 @@ export function ChiTietTaiKhoan({ account: initialAccount, onClose, onEdit, onTo
             try {
                 setLoading(true);
                 const data = await transactionService.getAll();
-                // Store all related transactions, let the UI handle slicing
                 const filtered = data.filter((t: any) => t.paymentMethodId === account.id);
 
                 if (filtered.length === 0) {
@@ -168,204 +191,266 @@ export function ChiTietTaiKhoan({ account: initialAccount, onClose, onEdit, onTo
         fetchTransactions();
     }, [account.id]);
 
+    const isActive = account.status === 'active';
+    // Chỉ hiển thị và tính toán trên giao dịch PAID (đồng bộ với QuanLyThuChi)
+    const paidTransactions = transactions.filter(t =>
+        t.paymentStatus === 'PAID' &&
+        t.approvalStatus !== 'CANCELLED' &&
+        t.approvalStatus !== 'REJECTED'
+    );
+    const displayedTransactions = showAllTransactions ? paidTransactions : paidTransactions.slice(0, 5);
+    // CHI âm, THU dương, VAY không tính
+    const totalTransactions = paidTransactions.reduce((sum, t) => {
+        const signed = getSignedAmount(t);
+        return signed !== null ? sum + signed : sum;
+    }, 0);
+    const computedBalance = (account.openingBalance || 0) + totalTransactions;
 
     return (
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
-            {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-gray-200">
-                <div className="flex items-start justify-between">
+        <div className="bg-white rounded-2xl shadow-2xl w-full flex flex-col max-h-[90vh] overflow-hidden">
+
+            {/* ── HEADER ─────────────────────────────────── */}
+            <div className="px-6 py-5 border-b border-gray-100 bg-white">
+                <div className="flex items-center justify-between">
+                    {/* Left: Title */}
                     <div>
-                        <h2 className="text-xl font-bold text-gray-800">
-                            Xem Chi Tiết Tài Khoản
-                        </h2>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Thông tin chi tiết và lịch sử giao dịch.
-                        </p>
+                        <h2 className="text-xl font-bold text-gray-900">Xem Chi Tiết Tài Khoản</h2>
+                        <p className="text-sm text-gray-500 mt-0.5">Thông tin chi tiết và lịch sử giao dịch.</p>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    {/* Right: Actions + Close */}
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => onEdit(account)}
+                            className="flex items-center gap-2 px-4 py-2 bg-[#004aad] hover:bg-[#1557A0] text-white rounded-lg font-semibold text-sm transition-colors"
+                        >
+                            <Edit2 className="w-4 h-4" />
+                            Sửa thông tin
+                        </button>
+                        <button
+                            onClick={() => onToggleStatus(account)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${isActive
+                                ? 'bg-red-500 hover:bg-red-600 text-white'
+                                : 'bg-green-500 hover:bg-green-600 text-white'
+                                }`}
+                        >
+                            {isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                            {isActive ? 'Khóa tài khoản' : 'Mở khóa'}
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Modal Content */}
-            <div className="overflow-y-auto flex-1 px-6 py-6 custom-scrollbar">
+            {/* ── BODY ──────────────────────────────────── */}
+            <div className="overflow-y-auto flex-1 px-6 py-6 space-y-5 bg-gray-50">
 
-                {/* Action Bar */}
-                <div className="flex items-center gap-3 mb-8">
-                    <button
-                        onClick={() => onEdit(account)}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-bold text-xs shadow-sm"
-                    >
-                        <Edit2 className="w-4 h-4 text-blue-600" />
-                        SỬA THÔNG TIN
-                    </button>
-                    <button
-                        onClick={() => onToggleStatus(account)}
-                        className={`flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-bold text-xs shadow-sm ${account.status === 'active' ? 'text-red-600' : 'text-green-600'
-                            }`}
-                    >
-                        <Lock className="w-4 h-4" />
-                        {account.status === 'active' ? 'KHÓA TÀI KHOẢN' : 'MỞ KHÓA TÀI KHOẢN'}
-                    </button>
-                    <div className="ml-auto" />
-                </div>
+                {/* Info Cards Row */}
+                <div className="grid grid-cols-2 gap-4">
 
-                <div className="space-y-8">
-                    {/* Information Sections */}
-                    <div className="grid grid-cols-2 gap-0 border border-gray-100 rounded-2xl overflow-hidden shadow-sm bg-white mb-6">
-                        {/* Section 1: Basic Info */}
-                        <div className="p-6 space-y-5 border-r border-gray-100">
-                            <h3 className="text-[12px] font-bold text-[#004aad] uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <Landmark className="w-4 h-4" /> Thông tin cơ bản
-                            </h3>
-                            <div className="grid grid-cols-2 gap-6">
+                    {/* LEFT: Basic Info */}
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Landmark className="w-4 h-4 text-[#004aad]" />
+                            <h3 className="text-lg font-bold text-gray-500 uppercase tracking-widest">Thông tin cơ bản</h3>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-500 mb-1.5 uppercase tracking-tight">Mã tài khoản</label>
-                                    <p className="text-[14px] font-bold text-gray-900">{account.code}</p>
+                                    <p className="text-sm text-gray-400 mb-1">Mã tài khoản</p>
+                                    <p className="text-base font-semibold text-gray-800">{account.code}</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-500 mb-1.5 uppercase tracking-tight">Loại tài khoản</label>
-                                    <p className="text-[14px] font-bold text-gray-900">{account.type}</p>
+                                    <p className="text-sm text-gray-400 mb-1">Loại tài khoản</p>
+                                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 border border-gray-200">
+                                        {getTypeIcon(account.type)}
+                                        {account.type}
+                                    </span>
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-gray-500 mb-1.5 uppercase tracking-tight">Tên tài khoản</label>
-                                <p className="text-[15px] font-bold text-[#004aad] uppercase tracking-tight">{account.name}</p>
+                                <p className="text-sm text-gray-400 mb-1">Tên tài khoản</p>
+                                <p className="text-base font-bold text-[#004aad]">{account.name}</p>
                             </div>
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-500 mb-1.5 uppercase tracking-tight">Chủ tài khoản</label>
-                                    <p className="text-[14px] font-bold text-gray-900">{account.owner}</p>
+                                    <p className="text-sm text-gray-400 mb-1">Chủ tài khoản</p>
+                                    <p className="text-base font-semibold text-gray-800">{account.owner}</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-500 mb-1.5 uppercase tracking-tight">Số tài khoản / Thông tin</label>
-                                    <p className="text-[14px] font-bold text-gray-900 tracking-wider font-mono">{account.accountInfo}</p>
+                                    <p className="text-sm text-gray-400 mb-1">Số tài khoản</p>
+                                    <p className="text-base font-semibold text-gray-800 font-mono">{account.accountInfo}</p>
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-400 mb-1">Đơn vị quản lý</p>
+                                <div className="flex items-center gap-1.5">
+                                    <Briefcase className="w-4 h-4 text-gray-400" />
+                                    <p className="text-base font-semibold text-gray-800">{account.buName}</p>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Section 2: Financial Info */}
-                        <div className="p-6 space-y-5 bg-gray-50/30">
-                            <h3 className="text-[12px] font-bold text-[#004aad] uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <Calculator className="w-4 h-4" /> Thông tin tài chính
-                            </h3>
+                    {/* RIGHT: Financial Info */}
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Calculator className="w-4 h-4 text-[#004aad]" />
+                            <h3 className="text-lg font-bold text-gray-500 uppercase tracking-widest">Thông tin tài chính</h3>
+                        </div>
+                        <div className="space-y-4">
+                            {/* Balance */}
                             <div>
-                                <label className="block text-sm font-semibold text-gray-500 mb-1.5 uppercase tracking-tight">Số dư hiện tại</label>
-                                <div className="bg-white p-5 rounded-xl border border-blue-100 shadow-sm flex justify-between items-baseline group hover:border-[#004aad] transition-colors">
-                                    <span className="text-[28px] font-bold text-[#004aad] tracking-tighter">{formatCurrency(account.balance || 0)}</span>
-                                    <span className="text-[12px] font-bold text-gray-400 italic ml-2">VND</span>
+                                <p className="text-sm text-gray-400 mb-1.5">Số dư hiện tại</p>
+                                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 flex items-baseline justify-between">
+                                    <span className="text-3xl font-black text-[#004aad] tracking-tight">{formatCurrency(computedBalance)}</span>
+                                    <span className="text-base text-blue-400 ml-2">VND</span>
                                 </div>
+                                <p className="text-xs text-gray-400 mt-1.5">
+                                    = Số dư ban đầu ({formatCurrency(account.openingBalance || 0)}) + Tổng thu/chi ({totalTransactions >= 0 ? '+' : ''}{formatCurrency(totalTransactions)}) — VAY không tính
+                                </p>
                             </div>
-                            <div className="grid grid-cols-2 gap-6 pt-1">
+                            {/* Status + Opening Balance */}
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-500 mb-1.5 uppercase tracking-tight">Trạng thái</label>
-                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold border uppercase tracking-wider shadow-sm ${account.status === 'active'
+                                    <p className="text-sm text-gray-400 mb-1">Trạng thái</p>
+                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border ${isActive
                                         ? 'bg-green-50 border-green-100 text-green-700'
                                         : 'bg-red-50 border-red-100 text-red-700'
                                         }`}>
-                                        <div className={`w-1.5 h-1.5 rounded-full ${account.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`} />
-                                        {account.status === 'active' ? 'Hoạt động' : 'Đã khóa'}
+                                        {isActive
+                                            ? <CheckCircle className="w-4 h-4" />
+                                            : <XCircle className="w-4 h-4" />
+                                        }
+                                        {isActive ? 'Hoạt động' : 'Đã khóa'}
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-500 mb-1.5 uppercase tracking-tight">Số dư ban đầu</label>
-                                    <p className="text-[14px] font-bold text-gray-900">{formatCurrency(account.openingBalance || 0)} <span className="text-[10px] text-gray-400 italic">VND</span></p>
+                                    <p className="text-sm text-gray-400 mb-1">Số dư ban đầu</p>
+                                    <p className="text-base font-semibold text-gray-800">
+                                        {formatCurrency(account.openingBalance || 0)} <span className="text-sm text-gray-400">VND</span>
+                                    </p>
+                                </div>
+                            </div>
+                            {/* Created info */}
+                            <div className="pt-3 border-t border-gray-100">
+                                <p className="text-sm text-gray-400 mb-1.5">Thông tin tạo</p>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5">
+                                        <UserIcon className="w-4 h-4 text-gray-400" />
+                                        <span className="text-base font-semibold text-gray-800">{account.createdBy}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <Calendar className="w-4 h-4 text-gray-400" />
+                                        <span className="text-sm text-gray-500 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">{account.createdAt}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Section 3: Management Info */}
-                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm flex items-center divide-x divide-gray-100">
-                        <div className="flex-1 px-2 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center border border-gray-100 shrink-0">
-                                <Briefcase className="w-5 h-5 text-gray-400" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-500 uppercase tracking-tight mb-0.5">Đơn vị quản lý</label>
-                                <p className="text-[14px] font-bold text-gray-900 uppercase tracking-tight">{account.buName}</p>
-                            </div>
+                {/* Transaction History */}
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <HistoryIcon className="w-4 h-4 text-[#004aad]" />
+                            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest">Lịch sử giao dịch</h3>
                         </div>
-                        <div className="flex-1 px-6">
-                            <label className="block text-sm font-semibold text-gray-500 uppercase tracking-tight mb-1.5">Thông tin tạo</label>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[14px] font-bold text-gray-900">{account.createdBy}</span>
-                                <span className="text-[12px] text-gray-400 font-medium tracking-tight bg-gray-50 px-2 py-0.5 rounded border border-gray-100">{account.createdAt}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Section 4: Transaction History */}
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-[12px] font-bold text-[#004aad] uppercase tracking-widest flex items-center gap-2">
-                                <HistoryIcon className="w-4 h-4" /> Lịch sử giao dịch gần đây
-                            </h3>
+                        {paidTransactions.length > 5 && (
                             <button
-                                onClick={handleViewAllTransactions}
-                                className="text-[9px] font-bold text-[#004aad] hover:underline uppercase tracking-widest bg-[#004aad]/5 px-2 py-1 rounded"
+                                onClick={() => setShowAllTransactions(!showAllTransactions)}
+                                className="text-xs font-bold text-[#004aad] hover:underline bg-blue-50 px-3 py-1 rounded-lg transition-colors"
                             >
-                                {showAllTransactions ? 'THU GỌN' : 'XEM TẤT CẢ GIAO DỊCH'}
+                                {showAllTransactions ? 'Thu gọn' : `Xem tất cả (${paidTransactions.length})`}
                             </button>
-                        </div>
-                        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-gray-50/50 border-b border-gray-100">
-                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-wider">Ngày</th>
-                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-wider">Mã GD</th>
-                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-wider">Loại</th>
-                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-wider">Đối tượng</th>
-                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-wider">BU</th>
-                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-wider text-right">Số tiền</th>
+                        )}
+                    </div>
+                    <div className="overflow-auto max-h-72">
+                        <table className="w-full text-left min-w-[620px]">
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-gray-50 border-b border-gray-100">
+                                    <th className="px-5 py-3 text-sm font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Ngày</th>
+                                    <th className="px-5 py-3 text-sm font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Mã GD</th>
+                                    <th className="px-5 py-3 text-sm font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Loại GD</th>
+                                    <th className="px-5 py-3 text-sm font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Đối tượng</th>
+                                    <th className="px-5 py-3 text-sm font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">BU</th>
+                                    <th className="px-5 py-3 text-sm font-bold text-gray-400 uppercase tracking-wider text-right whitespace-nowrap">Số tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={6} className="py-10 text-center text-base text-gray-400">Đang tải dữ liệu...</td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {transactions.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={6} className="py-12 text-center text-xs font-bold text-gray-400 uppercase italic">
-                                                Chưa có dữ liệu giao dịch
+                                ) : transactions.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="py-10 text-center text-base text-gray-400">Chưa có dữ liệu giao dịch</td>
+                                    </tr>
+                                ) : (
+                                    displayedTransactions.map((txn) => (
+                                        <tr key={txn.id} className="hover:bg-blue-50/30 transition-colors">
+                                            <td className="px-5 py-3.5 text-base text-gray-600 whitespace-nowrap">{formatDate(txn.transactionDate)}</td>
+                                            <td className="px-5 py-3.5 whitespace-nowrap">
+                                                <button
+                                                    onClick={() => navigate(`/quan-ly-thu-chi?highlight=${txn.id}&t=${Date.now()}`)}
+                                                    className="text-sm font-bold text-[#004aad] bg-blue-50 px-2 py-1 rounded border border-blue-100 hover:bg-blue-100 transition-colors font-mono"
+                                                >
+                                                    {txn.transactionCode}
+                                                </button>
+                                            </td>
+                                            <td className="px-5 py-3.5 whitespace-nowrap">
+                                                <div className="flex items-center gap-1.5">
+                                                    {getTransactionTypeIcon(txn.transactionType)}
+                                                    <span className={`text-sm font-bold uppercase ${txn.transactionType === 'INCOME' ? 'text-green-600' :
+                                                        txn.transactionType === 'EXPENSE' ? 'text-red-500' : 'text-blue-600'
+                                                        }`}>
+                                                        {getTransactionTypeLabel(txn.transactionType)}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-3.5 text-base font-medium text-gray-700 whitespace-nowrap max-w-[160px] truncate">{getObjectName(txn)}</td>
+                                            <td className="px-5 py-3.5 text-sm text-gray-500 whitespace-nowrap">{txn.businessUnit?.name || 'N/A'}</td>
+                                            <td className={`px-5 py-3.5 text-base font-bold text-right whitespace-nowrap ${getSignedAmount(txn) === null ? 'text-blue-500'
+                                                : getSignedAmount(txn)! > 0 ? 'text-green-600'
+                                                    : 'text-red-500'
+                                                }`}>
+                                                {getSignedAmount(txn) === null
+                                                    ? formatCurrency(Math.abs(txn.amount || 0))
+                                                    : getSignedAmount(txn)! > 0
+                                                        ? `+${formatCurrency(getSignedAmount(txn)!)}`
+                                                        : `-${formatCurrency(Math.abs(getSignedAmount(txn)!))}`
+                                                }
                                             </td>
                                         </tr>
-                                    ) : (
-                                        (showAllTransactions ? transactions : transactions.slice(0, 5)).map((txn) => (
-                                            <tr key={txn.id} className="hover:bg-blue-50/30 transition-colors group">
-                                                <td className="px-4 py-3.5 text-xs font-bold text-gray-600">{formatDate(txn.transactionDate)}</td>
-                                                <td className="px-4 py-3.5 text-xs font-black text-blue-600 uppercase tracking-tighter">{txn.transactionCode}</td>
-                                                <td className="px-4 py-3.5">
-                                                    <div className="flex items-center gap-2">
-                                                        {getTransactionTypeIcon(txn.transactionType)}
-                                                        <span className={`text-[10px] font-black uppercase tracking-tight ${txn.transactionType === 'INCOME' ? 'text-green-600' :
-                                                            txn.transactionType === 'EXPENSE' ? 'text-red-500' : 'text-blue-600'
-                                                            }`}>
-                                                            {getTransactionTypeLabel(txn.transactionType)}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3.5 text-xs font-bold text-gray-700 truncate">{getObjectName(txn)}</td>
-                                                <td className="px-4 py-3.5 text-[10px] font-black text-gray-500 uppercase truncate">{txn.businessUnit?.name || 'N/A'}</td>
-                                                <td className={`px-4 py-3.5 text-xs font-black text-right ${txn.amount > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                                    {txn.amount > 0 ? '+' : ''}{formatCurrency(txn.amount)}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                    ))
+                                )}
+                            </tbody>
+                            {!loading && transactions.length > 0 && (
+                                <tfoot>
+                                    <tr className="bg-gray-50 border-t-2 border-gray-200">
+                                        <td colSpan={5} className="px-5 py-3 text-sm font-bold text-gray-600 uppercase tracking-wider">Tổng cộng</td>
+                                        <td className={`px-5 py-3 text-base font-black text-right whitespace-nowrap ${totalTransactions >= 0 ? 'text-green-600' : 'text-red-500'
+                                            }`}>
+                                            {totalTransactions >= 0 ? '+' : '-'}{formatCurrency(Math.abs(totalTransactions))}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            )}
+                        </table>
                     </div>
                 </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="border-t border-gray-200 px-6 py-5 flex justify-center bg-gray-50/30">
+            {/* ── FOOTER ─────────────────────────────────── */}
+            <div className="border-t border-gray-100 px-6 py-4 flex justify-center bg-white">
                 <button
                     onClick={onClose}
-                    className="px-16 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-100 transition-colors font-black text-xs uppercase tracking-widest shadow-sm"
+                    className="px-10 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm shadow-sm"
                 >
                     Đóng cửa sổ
                 </button>

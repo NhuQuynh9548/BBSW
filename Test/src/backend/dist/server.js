@@ -27,6 +27,7 @@ const logs_1 = __importDefault(require("./routes/logs"));
 const settings_1 = __importDefault(require("./routes/settings"));
 const notifications_1 = __importDefault(require("./routes/notifications"));
 const auditLogs_1 = __importDefault(require("./routes/auditLogs"));
+const salaryConfigs_1 = __importDefault(require("./routes/salaryConfigs"));
 const path_1 = __importDefault(require("path"));
 // Load environment variables
 dotenv_1.default.config();
@@ -58,6 +59,7 @@ app.use('/api/logs', logs_1.default);
 app.use('/api/settings', settings_1.default);
 app.use('/api/notifications', notifications_1.default);
 app.use('/api/audit-logs', auditLogs_1.default);
+app.use('/api/salary-configs', salaryConfigs_1.default);
 // Swagger API Documentation
 app.use('/api-docs', swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swagger_1.default, {
     customCss: '.swagger-ui .topbar { display: none }',

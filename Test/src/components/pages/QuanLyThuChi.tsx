@@ -1426,7 +1426,12 @@ export function QuanLyThuChi() {
                           <td className={`px-6 py-4 text-right text-sm font-bold ${txn.transactionType === 'INCOME' ? 'text-green-600' :
                             txn.transactionType === 'EXPENSE' ? 'text-red-600' : 'text-blue-600'
                             }`}>
-                            {txn.transactionType === 'INCOME' ? '+' : '-'}{formatCurrency(txn.amount)}
+                            {txn.transactionType === 'INCOME'
+                              ? `+${formatCurrency(txn.amount)}`
+                              : txn.transactionType === 'EXPENSE'
+                                ? `-${formatCurrency(txn.amount)}`
+                                : formatCurrency(txn.amount)
+                            }
                           </td>
                         );
                         if (col.id === 'attachments') return (
@@ -1543,9 +1548,9 @@ export function QuanLyThuChi() {
       {/* Modal */}
       {modalMode && (
         <div
-          className={`fixed inset-0 bg-black/40 z-[999998] flex items-center justify-center p-4 transition-all animate-in fade-in duration-300 ${showAuditLog ? 'opacity-30 pointer-events-none blur-[2px]' : 'opacity-100'}`}
+          className={`modal-overlay-container ${showAuditLog ? 'opacity-30 pointer-events-none blur-[2px]' : 'opacity-100'}`}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="modal-content-container max-w-4xl">
             {/* Modal Header */}
             <div className="border-b border-gray-200 px-6 py-5 flex items-start justify-between bg-white">
               <div>
@@ -2111,10 +2116,8 @@ export function QuanLyThuChi() {
 
       {/* Audit Log Modal */}
       {showAuditLog && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[999999] animate-in fade-in duration-300"
-        >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-4xl">
             {/* Header */}
             <div className="border-b border-gray-200 px-6 py-5 flex items-start justify-between bg-white">
               <div>
@@ -2236,8 +2239,8 @@ export function QuanLyThuChi() {
       )}
       {/* Quick Attachment Preview Modal */}
       {previewAttachmentsTxn && (
-        <div className="fixed inset-0 bg-black/60 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh]">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-2xl">
             <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between bg-white flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-50 rounded-lg">

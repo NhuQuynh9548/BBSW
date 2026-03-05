@@ -77,7 +77,11 @@ router.get('/', async (req, res) => {
             workStatus: emp.workStatus.toLowerCase(),
             birthDate: emp.birthDate ? emp.birthDate.toLocaleDateString('vi-VN') : '',
             idCard: emp.idCard || '',
-            address: emp.address
+            address: emp.address,
+            actualSalary: emp.actualSalary || 0,
+            contractType: emp.contractType || 'chinh-thuc',
+            contractStartDate: emp.contractStartDate ? emp.contractStartDate.toLocaleDateString('vi-VN') : '',
+            contractEndDate: emp.contractEndDate ? emp.contractEndDate.toLocaleDateString('vi-VN') : '',
         }));
         res.json(transformedEmployees);
     }
@@ -111,7 +115,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/employees
 router.post('/', async (req, res) => {
     try {
-        const { fullName, email, phone, businessUnit, specialization, level, joinDate, birthDate, idCard, address } = req.body;
+        const { fullName, email, phone, businessUnit, specialization, level, joinDate, birthDate, idCard, address, actualSalary, contractType, contractStartDate, contractEndDate } = req.body;
         if (!businessUnit) {
             return res.status(400).json({ error: 'Business Unit is required' });
         }
@@ -154,13 +158,17 @@ router.post('/', async (req, res) => {
             fullName,
             email,
             phone,
-            businessUnitId: bu.id,
-            specializationId: spec?.id,
-            levelId: lvl?.id,
+            businessUnit: { connect: { id: bu.id } },
+            ...(spec && { specialization: { connect: { id: spec.id } } }),
+            ...(lvl && { level: { connect: { id: lvl.id } } }),
             joinDate: parseDate(joinDate),
             birthDate: parseDate(birthDate),
             idCard,
             address,
+            actualSalary: actualSalary ? parseFloat(actualSalary) : 0,
+            contractType: contractType || 'chinh-thuc',
+            contractStartDate: parseDate(contractStartDate),
+            contractEndDate: parseDate(contractEndDate),
             workStatus: 'WORKING'
         };
         const employee = await prisma_1.default.employee.create({
@@ -196,7 +204,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { fullName, email, phone, businessUnit, specialization, level, joinDate, birthDate, idCard, address, workStatus } = req.body;
+        const { fullName, email, phone, businessUnit, specialization, level, joinDate, birthDate, idCard, address, workStatus, actualSalary, contractType, contractStartDate, contractEndDate } = req.body;
         const currentEmployee = await prisma_1.default.employee.findUnique({ where: { id: id } });
         if (!currentEmployee)
             return res.status(404).json({ error: 'Employee not found' });
@@ -231,13 +239,17 @@ router.put('/:id', async (req, res) => {
                 fullName,
                 email,
                 phone,
-                ...(bu && { businessUnitId: bu.id }),
-                ...(spec && { specializationId: spec.id }),
-                ...(lvl && { levelId: lvl.id }),
+                ...(bu && { businessUnit: { connect: { id: bu.id } } }),
+                ...(spec && { specialization: { connect: { id: spec.id } } }),
+                ...(lvl && { level: { connect: { id: lvl.id } } }),
                 ...(joinDate && { joinDate: parseDate(joinDate) }),
                 ...(birthDate && { birthDate: parseDate(birthDate) }),
                 idCard,
                 address,
+                actualSalary: actualSalary !== undefined ? parseFloat(actualSalary) : undefined,
+                contractType,
+                contractStartDate: contractStartDate !== undefined ? parseDate(contractStartDate) : undefined,
+                contractEndDate: contractEndDate !== undefined ? parseDate(contractEndDate) : undefined,
                 ...(workStatus && { workStatus: workStatus.toUpperCase() })
             },
             include: {
@@ -297,6 +309,77 @@ router.delete('/:id', async (req, res) => {
     catch (error) {
         console.error('Delete employee error:', error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+// PATCH /api/employees/:id/salary - dedicated salary-only update with history
+router.patch('/:id/salary', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { actualSalary, description } = req.body;
+        if (actualSalary === undefined || actualSalary === null) {
+            return res.status(400).json({ error: 'actualSalary is required' });
+        }
+        const salary = parseFloat(String(actualSalary));
+        if (isNaN(salary) || salary < 0) {
+            return res.status(400).json({ error: 'Invalid salary value' });
+        }
+        const currentEmployee = await prisma_1.default.employee.findUnique({ where: { id: id } });
+        if (!currentEmployee)
+            return res.status(404).json({ error: 'Employee not found' });
+        const now = new Date();
+        // 1. Close the previous salary period (set effectiveTo = now) on all open records
+        await prisma_1.default.salaryHistory.updateMany({
+            where: { employeeId: id, effectiveTo: null },
+            data: { effectiveTo: now }
+        });
+        // 2. Update actualSalary on employee
+        const employee = await prisma_1.default.employee.update({
+            where: { id: id },
+            data: { actualSalary: salary },
+            select: { id: true, actualSalary: true, fullName: true, employeeId: true }
+        });
+        // 3. Create a new salary history record
+        await prisma_1.default.salaryHistory.create({
+            data: {
+                employeeId: id,
+                salary: salary,
+                effectiveFrom: now,
+                effectiveTo: null,
+                description: description || 'Điều chỉnh lương'
+            }
+        });
+        // Audit Log
+        await auditService_1.auditService.log({
+            tableName: 'Employee',
+            recordId: employee.id,
+            action: 'UPDATE',
+            userId: req.user.id,
+            oldValues: { actualSalary: currentEmployee.actualSalary },
+            newValues: { actualSalary: employee.actualSalary },
+            changes: { actualSalary: { old: currentEmployee.actualSalary, new: employee.actualSalary } },
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent']
+        });
+        res.json({ success: true, id: employee.id, actualSalary: employee.actualSalary });
+    }
+    catch (error) {
+        console.error('Salary patch error:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+});
+// GET /api/employees/:id/salary-history - get salary change history
+router.get('/:id/salary-history', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const history = await prisma_1.default.salaryHistory.findMany({
+            where: { employeeId: id },
+            orderBy: { effectiveFrom: 'desc' }
+        });
+        res.json(history);
+    }
+    catch (error) {
+        console.error('Salary history error:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
     }
 });
 exports.default = router;

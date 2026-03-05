@@ -1,0 +1,80 @@
+/* Global Modal Centering and Backdrop Styles */
+.modal-overlay-container {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background-color: rgba(0, 0, 0, 0.4) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    animation: modal-fade-in 0.3s ease-out;
+}
+
+.modal-content-container {
+    background-color: white;
+    border-radius: 1rem;
+    /* 2xl equivalent */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    /* shadow-2xl equivalent */
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modal-zoom-in 0.2s ease-out;
+}
+
+@keyframes modal-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes modal-zoom-in {
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Legacy classes for backward compatibility while refactoring */
+.modal-overlay-dark {
+    background-color: rgba(0, 0, 0, 0.4) !important;
+}
+
+.modal-backdrop-blur {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+}
+
+/* Ensure animations work with these custom classes */
+.animate-in {
+    animation-duration: 300ms;
+    animation-fill-mode: forwards;
+}
+
+.fade-in {
+    animation-name: fadeIn;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}

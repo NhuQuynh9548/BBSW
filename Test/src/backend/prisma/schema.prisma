@@ -123,8 +123,11 @@ model Employee {
   businessUnit      BusinessUnit    @relation(fields: [businessUnitId], references: [id])
   level             EmployeeLevel?  @relation(fields: [levelId], references: [id])
   specialization    Specialization? @relation(fields: [specializationId], references: [id])
-  transactions      Transaction[]
-  salaryHistory     SalaryHistory[]
+  transactions        Transaction[]
+  salaryHistory       SalaryHistory[]
+  chiTietChamCong     ChiTietChamCong[]
+  tongHopChamCong     TongHopChamCong[]
+  salaryRecords       SalaryRecord[]
 
   @@map("employees")
 }
@@ -278,6 +281,7 @@ model PaymentMethod {
   owner        String?       @map("owner")
   buName       String?       @map("bu_name")
   balance      Float         @default(0) @map("balance")
+  openingBalance Float       @default(0) @map("opening_balance")
   status       String        @default("active") @map("status")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
@@ -496,3 +500,103 @@ model SalaryConfig {
 
   @@map("salary_configs")
 }
+
+model MaChamCong {
+  id            String            @id @default(uuid())
+  ma            String            @unique
+  ten           String
+  loai          String
+  giaTriCong    Float             @default(1) @map("gia_tri_cong")
+  duocTinhLuong Boolean           @default(true) @map("duoc_tinh_luong")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  chiTiet       ChiTietChamCong[]
+
+  @@map("ma_cham_cong")
+}
+
+model KyChamCong {
+  id              String            @id @default(uuid())
+  tenKy           String            @map("ten_ky")
+  ngayBatDau      DateTime          @map("ngay_bat_dau")
+  ngayKetThuc     DateTime          @map("ngay_ket_thuc")
+  trangThai       String            @default("nhap") @map("trang_thai")
+  congChuan       Float?            @map("cong_chuan")
+  loaiTruChuNhat  Boolean           @default(true) @map("loai_tru_chu_nhat")
+  loaiTruNgayLe   Boolean           @default(true) @map("loai_tru_ngay_le")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  chiTiet         ChiTietChamCong[]
+  tongHop         TongHopChamCong[]
+  salaryRecords   SalaryRecord[]
+
+  @@map("ky_cham_cong")
+}
+
+model ChiTietChamCong {
+  id            String      @id @default(uuid())
+  kyId          String      @map("ky_id")
+  employeeId    String      @map("employee_id")
+  ngay          DateTime    @db.Date
+  maChamCongId  String?     @map("ma_cham_cong_id")
+  giaTriCong    Float       @default(0) @map("gia_tri_cong")
+  ghiChu        String?     @map("ghi_chu")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  ky            KyChamCong  @relation(fields: [kyId], references: [id], onDelete: Cascade)
+  employee      Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  maChamCong    MaChamCong? @relation(fields: [maChamCongId], references: [id])
+
+  @@unique([kyId, employeeId, ngay])
+  @@index([kyId])
+  @@index([employeeId])
+  @@map("chi_tiet_cham_cong")
+}
+
+model TongHopChamCong {
+  id                String     @id @default(uuid())
+  kyId              String     @map("ky_id")
+  employeeId        String     @map("employee_id")
+  congChuan         Float      @default(0) @map("cong_chuan")
+  congChinhThuc     Float      @default(0) @map("cong_chinh_thuc")
+  congThuViec       Float      @default(0) @map("cong_thu_viec")
+  phepNam           Float      @default(0) @map("phep_nam")
+  khongLuong        Float      @default(0) @map("khong_luong")
+  nghiLe            Float      @default(0) @map("nghi_le")
+  nghiBu            Float      @default(0) @map("nghi_bu")
+  vang              Float      @default(0) @map("vang")
+  tongCongTinhLuong Float      @default(0) @map("tong_cong_tinh_luong")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  ky                KyChamCong @relation(fields: [kyId], references: [id], onDelete: Cascade)
+  employee          Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([kyId, employeeId])
+  @@index([kyId])
+  @@map("tong_hop_cham_cong")
+}
+
+model SalaryRecord {
+  id              String     @id @default(uuid())
+  kyId            String     @map("ky_id")
+  employeeId      String     @map("employee_id")
+  /// Phụ cấp thêm vào lương (VND)
+  phuCap          Float      @default(0) @map("phu_cap")
+  /// Thưởng (VND)
+  thuong          Float      @default(0)
+  /// Số người phụ thuộc (giảm trừ gia cảnh)
+  soNPT           Int        @default(0) @map("so_npt")
+  /// Ghi đè lương cơ bản (null = dùng lương từ Employee)
+  luongCoBan      Float?     @map("luong_co_ban")
+  /// Ghi đè công chính thức (null = dùng từ TongHopChamCong)
+  congThucTe      Float?     @map("cong_thuc_te")
+  ghiChu          String?    @map("ghi_chu")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  ky              KyChamCong @relation(fields: [kyId], references: [id], onDelete: Cascade)
+  employee        Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([kyId, employeeId])
+  @@index([kyId])
+  @@index([employeeId])
+  @@map("salary_records")
+}
+

@@ -298,8 +298,8 @@ export function CapBacNhanSu() {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-2xl">
             <div className="border-b border-gray-200 px-6 py-5 bg-white">
               <div className="flex items-start justify-between">
                 <div>
@@ -386,14 +386,13 @@ export function CapBacNhanSu() {
               </button>
             </div>
           </div>
-        </div >
-      )
-      }
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && deletingLevel && (
-        <div className="fixed inset-0 bg-black/40 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200 overflow-hidden">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-md">
             <div className="p-8">
               <div className="flex flex-col items-center text-center gap-4 mb-6">
                 <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center">
@@ -436,8 +435,8 @@ export function CapBacNhanSu() {
       )}
       {/* View Details Modal */}
       {viewingLevel && (
-        <div className="fixed inset-0 bg-black/40 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-lg">
             <div className="border-b border-gray-200 px-6 py-5 bg-white">
               <div className="flex items-start justify-between">
                 <div>

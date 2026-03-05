@@ -273,8 +273,8 @@ export function PhanBoChiPhi() {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-2xl">
             <form onSubmit={handleSubmit} className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold">
@@ -329,8 +329,8 @@ export function PhanBoChiPhi() {
               </div>
 
               <div className="mt-6 flex justify-end gap-3 border-t pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 rounded">Hủy</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Lưu</button>
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 rounded transition-colors hover:bg-gray-200">Hủy</button>
+                <button type="submit" className="px-4 py-2 bg-[#004aad] text-white rounded hover:bg-[#1557A0] transition-colors">Lưu</button>
               </div>
             </form>
           </div>

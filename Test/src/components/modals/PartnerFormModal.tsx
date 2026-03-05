@@ -237,8 +237,8 @@ export function PartnerFormModal({ mode, selectedPartner, allPartners = [], onCl
     const isReadOnly = mode === 'view';
 
     return (
-        <div className="fixed inset-0 bg-black/40 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+        <div className="modal-overlay-container">
+            <div className="modal-content-container max-w-6xl">
                 <div className="border-b border-gray-200 px-6 py-5 bg-white">
                     <div className="flex items-start justify-between">
                         <div>

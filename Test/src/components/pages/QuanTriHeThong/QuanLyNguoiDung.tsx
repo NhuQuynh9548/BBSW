@@ -577,8 +577,8 @@ export function QuanLyNguoiDung() {
 
       {/* Create/View/Edit Modal */}
       {modalMode && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-4xl">
             <div className="border-b border-gray-200 px-6 py-5">
               <div className="flex items-start justify-between">
                 <div>
@@ -794,8 +794,8 @@ export function QuanLyNguoiDung() {
 
       {/* Lock/Unlock Confirmation Modal */}
       {showLockConfirm && lockingUser && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-md">
             <div className="p-6">
               <div className="flex items-center gap-4 mb-4">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center ${lockingUser.status === 'active' ? 'bg-red-100' : 'bg-green-100'
@@ -854,8 +854,8 @@ export function QuanLyNguoiDung() {
 
       {/* Reset Password Confirmation Modal */}
       {showResetPasswordConfirm && resettingUser && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-md">
             <div className="p-6">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">

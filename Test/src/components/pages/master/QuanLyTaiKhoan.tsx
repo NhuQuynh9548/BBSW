@@ -31,6 +31,7 @@ interface Account {
     buName: string;
     status: 'active' | 'locked';
     balance?: number;
+    openingBalance?: number;
     logo?: string;
 }
 
@@ -55,7 +56,7 @@ export function QuanLyTaiKhoan() {
         accountInfo: '',
         buName: 'Tất cả BU',
         status: 'active' as 'active' | 'locked',
-        balance: 0,
+        openingBalance: 0,
     });
 
     const fetchData = async () => {
@@ -81,6 +82,7 @@ export function QuanLyTaiKhoan() {
                 buName: m.buName || 'Tất cả BU',
                 status: m.status === 'active' ? 'active' : 'locked',
                 balance: m.balance || 0,
+                openingBalance: Number(m.openingBalance || 0),
                 logo: m.logo // Optional
             }));
 
@@ -169,7 +171,7 @@ export function QuanLyTaiKhoan() {
             accountInfo: '',
             buName: 'Tất cả BU',
             status: 'active',
-            balance: 0,
+            openingBalance: 0,
         });
         setShowModal(true);
     };
@@ -184,7 +186,7 @@ export function QuanLyTaiKhoan() {
             accountInfo: account.accountInfo,
             buName: account.buName,
             status: account.status,
-            balance: account.balance || 0,
+            openingBalance: account.openingBalance || 0,
         });
         setShowModal(true);
     };
@@ -452,8 +454,8 @@ export function QuanLyTaiKhoan() {
 
             {/* Add/Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="modal-overlay-container">
+                    <div className="modal-content-container max-w-2xl">
                         <div className="px-6 py-5 border-b border-gray-200">
                             <div className="flex items-start justify-between">
                                 <div>
@@ -538,14 +540,15 @@ export function QuanLyTaiKhoan() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">Số dư hiện tại</label>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">Số dư ban đầu (VND)</label>
                                     <input
                                         type="number"
                                         className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#004aad] outline-none transition-all"
                                         placeholder="0"
-                                        value={formData.balance}
-                                        onChange={e => setFormData({ ...formData, balance: Number(e.target.value) })}
+                                        value={formData.openingBalance}
+                                        onChange={e => setFormData({ ...formData, openingBalance: Number(e.target.value) })}
                                     />
+                                    <p className="text-xs text-gray-400">Số dư hiện tại sẽ được tính tự động từ số dư ban đầu trừ tổng giao dịch.</p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -600,8 +603,8 @@ export function QuanLyTaiKhoan() {
 
             {/* Delete Confirm */}
             {showDeleteConfirm && deletingAccount && (
-                <div className="fixed inset-0 bg-black/40 z-[70] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-in fade-in zoom-in duration-200">
+                <div className="modal-overlay-container">
+                    <div className="modal-content-container max-w-md">
                         <div className="p-6">
                             <div className="flex items-center gap-4 mb-4 text-left">
                                 <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
@@ -649,18 +652,21 @@ export function QuanLyTaiKhoan() {
                     </div>
                 </div>
             )}
+
             {/* Detail View Modal */}
             {selectedAccountForDetail && (
-                <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 md:p-8 backdrop-blur-md animate-in fade-in duration-300">
-                    <ChiTietTaiKhoan
-                        account={selectedAccountForDetail}
-                        onClose={() => setSelectedAccountForDetail(null)}
-                        onEdit={(account) => {
-                            setSelectedAccountForDetail(null);
-                            handleEdit(account);
-                        }}
-                        onToggleStatus={handleToggleStatus}
-                    />
+                <div className="modal-overlay-container">
+                    <div className="modal-content-container max-w-4xl">
+                        <ChiTietTaiKhoan
+                            account={selectedAccountForDetail}
+                            onClose={() => setSelectedAccountForDetail(null)}
+                            onEdit={(account) => {
+                                setSelectedAccountForDetail(null);
+                                handleEdit(account);
+                            }}
+                            onToggleStatus={handleToggleStatus}
+                        />
+                    </div>
                 </div>
             )}
         </div>

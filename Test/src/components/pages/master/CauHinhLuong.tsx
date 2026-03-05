@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Search, Plus, Edit2, Trash2, X,
     AlertCircle, Calendar, Clock,
-    CheckCircle2, Info, Calculator, Briefcase
+    CheckCircle2, Info, Calculator, Briefcase, Save
 } from 'lucide-react';
 import { salaryConfigService, SalaryConfig, calculateSalaryRates } from '../../../services/salaryConfigService';
 
@@ -289,8 +289,8 @@ export function CauHinhLuong() {
 
             {/* Professional Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="modal-overlay-container">
+                    <div className="modal-content-container max-w-2xl">
 
                         {/* Modal Header */}
                         <div className="border-b border-gray-200 px-8 py-6 bg-white shrink-0">
@@ -599,25 +599,25 @@ export function CauHinhLuong() {
                                 onClick={() => setShowModal(false)}
                                 className="px-8 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium min-w-[140px]"
                             >
-                                Hủy bỏ
+                                Đóng cửa sổ
                             </button>
                             <button
                                 type="submit"
                                 form="config-form"
-                                className="px-8 py-2.5 bg-[#004aad] hover:bg-[#1557A0] text-white rounded-lg transition-colors font-medium shadow-md active:scale-95 flex items-center justify-center gap-2 min-w-[140px]"
+                                className="px-8 py-2.5 bg-[#004aad] text-white rounded-lg hover:bg-[#1557A0] transition-colors font-medium min-w-[140px] shadow-sm flex items-center justify-center gap-2"
                             >
-                                <CheckCircle2 className="w-4 h-4" />
-                                Lưu Cấu Hình
+                                <Save className="w-4 h-4" />
+                                {editingConfig ? 'Lưu thay đổi' : 'Tạo cấu hình'}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Modern Delete Confirm */}
+            {/* Delete Confirmation Modal */}
             {showDeleteConfirm && deletingConfig && (
-                <div className="fixed inset-0 bg-black/40 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200 overflow-hidden">
+                <div className="modal-overlay-container">
+                    <div className="modal-content-container max-w-md">
                         <div className="p-8">
                             <div className="flex flex-col items-center text-center gap-4 mb-6">
                                 <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center">

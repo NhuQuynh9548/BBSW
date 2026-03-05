@@ -27,6 +27,8 @@ import { CauHinhLuong } from './components/pages/master/CauHinhLuong';
 import { PhuongThucThanhToan } from './components/pages/master/PhuongThucThanhToan';
 import { QuanLyTaiKhoan } from './components/pages/master/QuanLyTaiKhoan';
 import { BangLuong } from './components/pages/BangLuong';
+import { ChamCong } from './components/pages/ChamCong';
+import { QuanLyTinhLuong } from './components/pages/QuanLyTinhLuong';
 import { ProfilePage } from './components/pages/ProfilePage';
 import { ChangePasswordPage } from './components/pages/ChangePasswordPage';
 import { DocumentViewer } from './components/pages/DocumentViewer';
@@ -50,6 +52,8 @@ function AppLayout() {
             <Route path="/quan-ly-bu" element={<QuanLyBU />} />
             <Route path="/quan-ly-thu-chi" element={<QuanLyThuChi />} />
             <Route path="/quan-ly-nhan-su" element={<QuanLyNhanSu />} />
+            <Route path="/nhan-su/cham-cong" element={<ChamCong />} />
+            <Route path="/nhan-su/tinh-luong" element={<QuanLyTinhLuong />} />
             <Route path="/bang-luong" element={<BangLuong />} />
             <Route path="/quan-ly-doi-tac" element={<QuanLyDoiTac />} />
 

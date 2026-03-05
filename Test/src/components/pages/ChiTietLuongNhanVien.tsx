@@ -94,6 +94,19 @@ export function ChiTietLuongNhanVien({ employee, config, onClose, onUpdate }: Ch
         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.round(amount));
     };
 
+    // Format for input display: just the number with dots (e.g. 20.000.000)
+    const formatInputDisplay = (val: number) => {
+        if (!val) return '';
+        return new Intl.NumberFormat('vi-VN').format(val);
+    };
+
+    // Parse formatted string back to number
+    const parseFormattedInput = (str: string): number => {
+        // Remove all dots (thousand separators) and parse
+        const cleaned = str.replace(/\./g, '').replace(/[^0-9]/g, '');
+        return parseInt(cleaned) || 0;
+    };
+
     const formatDate = (dateStr: string | null | undefined) => {
         if (!dateStr) return 'Nay';
         try { return new Date(dateStr).toLocaleDateString('vi-VN'); }
@@ -172,8 +185,8 @@ export function ChiTietLuongNhanVien({ employee, config, onClose, onUpdate }: Ch
     };
 
     return (
-        <div className="fixed inset-0 z-[999999] overflow-y-auto bg-black/40 flex items-start justify-center p-4 pt-16 md:pt-24 lg:pt-32">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-150">
+        <div className="modal-overlay-container">
+            <div className="modal-content-container max-w-2xl">
 
                 {/* Modal Header - Harmonized with Personnel Management */}
                 <div className="border-b border-gray-200 px-6 py-4 flex items-start justify-between bg-white shrink-0">
@@ -249,7 +262,11 @@ export function ChiTietLuongNhanVien({ employee, config, onClose, onUpdate }: Ch
                                 <div className="flex gap-3 items-end">
                                     <div className="flex-1">
                                         <p className="text-[10px] font-bold text-[#004aad] uppercase mb-1">Mức lương mới (VND)</p>
-                                        <input type="number" value={tempSalary} onChange={(e) => setTempSalary(parseInt(e.target.value) || 0)}
+                                        <input
+                                            type="text"
+                                            value={formatInputDisplay(tempSalary)}
+                                            onChange={(e) => setTempSalary(parseFormattedInput(e.target.value))}
+                                            placeholder="Nhập mức lương (VD: 20.000.000)"
                                             className="w-full h-10 px-3 bg-white border border-blue-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-100 focus:border-[#004aad] outline-none" />
                                     </div>
                                     <div className="flex gap-2">

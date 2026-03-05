@@ -205,6 +205,27 @@ router.post('/', async (req: AuthRequest, res: Response) => {
             userAgent: req.headers['user-agent'] as string
         });
 
+        // Tự động thêm nhân viên mới vào tất cả kỳ chấm công đang active (chưa khóa)
+        try {
+            const activeKy = await (prisma as any).kyChamCong.findMany({
+                where: { trangThai: { not: 'da_khoa' } },
+                select: { id: true, congChuan: true },
+            });
+            if (activeKy.length > 0) {
+                await (prisma as any).tongHopChamCong.createMany({
+                    data: activeKy.map((ky: any) => ({
+                        kyId: ky.id,
+                        employeeId: employee.id,
+                        congChuan: ky.congChuan || 0,
+                    })),
+                    skipDuplicates: true,
+                });
+            }
+        } catch (syncErr) {
+            // Không block việc tạo nhân viên nếu sync thất bại
+            console.error('Auto-sync cham cong error:', syncErr);
+        }
+
         res.status(201).json(employee);
     } catch (error: any) {
         console.error('Create employee error:', error);

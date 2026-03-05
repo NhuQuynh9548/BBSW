@@ -423,8 +423,8 @@ export function AuditLog() {
 
             {/* Modal Detail */}
             {selectedLog && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="modal-overlay-container">
+                    <div className="modal-content-container max-w-4xl">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900">Chi tiết Audit Log</h2>

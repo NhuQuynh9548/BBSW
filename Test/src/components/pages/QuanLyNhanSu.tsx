@@ -731,8 +731,8 @@ export function QuanLyNhanSu() {
 
           {/* Delete Confirmation Modal */}
           {showDeleteConfirm && deletingEmployee && (
-            <div className="fixed inset-0 bg-black/40 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-300">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="modal-overlay-container">
+              <div className="modal-content-container max-w-md">
                 <div className="p-8">
                   <div className="flex flex-col items-center text-center gap-4 mb-6">
                     <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center">
@@ -780,8 +780,8 @@ export function QuanLyNhanSu() {
 
           {/* Create/View/Edit Modal */}
           {modalMode && (
-            <div className="fixed inset-0 z-[999999] overflow-y-auto bg-black/40 flex items-start justify-center p-4 pt-16 md:pt-24 lg:pt-32 animate-in fade-in duration-300">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[85vh] overflow-hidden my-auto animate-in slide-in-from-top-4 duration-300 border border-gray-100">
+            <div className="modal-overlay-container">
+              <div className="modal-content-container max-w-3xl">
                 {/* Modal Header */}
                 <div className="border-b border-gray-200 px-6 py-4 flex items-start justify-between bg-white shrink-0">
                   <div>

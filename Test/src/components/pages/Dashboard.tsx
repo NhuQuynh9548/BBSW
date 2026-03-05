@@ -719,8 +719,8 @@ export function Dashboard() {
         const profit = selectedBUData.totalRevenue - selectedBUData.totalExpense;
 
         return (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+          <div className="modal-overlay-container">
+            <div className="modal-content-container max-w-6xl">
               {/* Header */}
               <div className="border-b border-gray-200 px-6 py-5">
                 <div className="flex items-start justify-between">
@@ -894,10 +894,8 @@ export function Dashboard() {
       })()}
 
       {showCategoryModal && createPortal(
-        <div
-          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-300"
-        >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-2xl">
             {/* Header */}
             <div className="border-b border-gray-200 px-6 py-5 relative">
               <div className="text-center">

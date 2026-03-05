@@ -297,8 +297,8 @@ export function PhanQuyenVaiTro() {
 
       {/* Create/View/Edit Modal - Permission Matrix */}
       {modalMode && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-6xl">
             <div className="border-b border-gray-200 px-6 py-5">
               <div className="flex items-start justify-between">
                 <div>
@@ -527,47 +527,45 @@ export function PhanQuyenVaiTro() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && deletingRole && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="p-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                  <AlertCircle className="w-6 h-6 text-red-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800">Xác nhận xóa vai trò</h3>
-                  <p className="text-sm text-gray-600">Hành động này không thể hoàn tác</p>
-                </div>
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-md p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-red-600" />
               </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Xác nhận xóa vai trò</h3>
+                <p className="text-sm text-gray-600">Hành động này không thể hoàn tác</p>
+              </div>
+            </div>
 
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <p className="text-sm text-gray-700">
-                  <span className="font-semibold">Vai trò:</span> {deletingRole.name}
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">Vai trò:</span> {deletingRole.name}
+              </p>
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">Số người dùng:</span> {deletingRole.userCount}
+              </p>
+              {deletingRole.userCount > 0 && (
+                <p className="text-sm text-red-600 mt-2">
+                  ⚠️ Cảnh báo: Còn {deletingRole.userCount} người dùng đang sử dụng vai trò này
                 </p>
-                <p className="text-sm text-gray-700">
-                  <span className="font-semibold">Số người dùng:</span> {deletingRole.userCount}
-                </p>
-                {deletingRole.userCount > 0 && (
-                  <p className="text-sm text-red-600 mt-2">
-                    ⚠️ Cảnh báo: Còn {deletingRole.userCount} người dùng đang sử dụng vai trò này
-                  </p>
-                )}
-              </div>
+              )}
+            </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
-                >
-                  Xác nhận xóa
-                </button>
-              </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+              >
+                Xác nhận xóa
+              </button>
             </div>
           </div>
         </div>

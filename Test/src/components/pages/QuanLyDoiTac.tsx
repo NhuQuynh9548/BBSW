@@ -648,8 +648,8 @@ export function QuanLyDoiTac() {
 
       {/* Deactivate Confirm Modal */}
       {showDeactivateConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-[999999] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200 overflow-hidden">
+        <div className="modal-overlay-container">
+          <div className="modal-content-container max-w-md">
             <div className="p-8">
               <div className="flex flex-col items-center text-center gap-4 mb-6">
                 <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center text-red-600">
