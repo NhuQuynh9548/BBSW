@@ -46,14 +46,44 @@ function tinhBH(luong: number) {
     return { bhxh, bhyt, bhtn, total: bhxh + bhyt + bhtn };
 }
 
+// Bảo hiểm phía Công ty phải đóng (2026)
+const TY_LE_BHXH_CT = 0.175;  // 17.5%
+const TY_LE_BHYT_CT = 0.030;  // 3%
+const TY_LE_BHTN_CT = 0.010;  // 1%
+const TY_LE_KPCD_CT = 0.000;  // KPCD 0%
+
+function tinhBHCongTy(luong: number) {
+    const bhxh = Math.min(luong, TRAN_BHXH) * TY_LE_BHXH_CT;
+    const bhyt = Math.min(luong, TRAN_BHYT) * TY_LE_BHYT_CT;
+    const bhtn = Math.min(luong, TRAN_BHXH) * TY_LE_BHTN_CT;
+    const kpcd = luong * TY_LE_KPCD_CT;
+    return { bhxh, bhyt, bhtn, kpcd, total: bhxh + bhyt + bhtn + kpcd };
+}
+
 function tinhThue(tntt: number): number {
     if (tntt <= 0) return 0;
+
+    // Thu nhập tính thuế (TNTT)
+    // Công thức tính nhanh 2026:
+    // <= 10 tr: Thuế = TNTT x 5%
+    // 10 - 30 tr: Thuế = TNTT x 10% - 0.5 tr
+    // 30 - 60 tr: Thuế = TNTT x 20% - 3.5 tr
+    // 60 - 100 tr: Thuế = TNTT x 30% - 9.5 tr
+    // > 100 tr: Thuế = TNTT x 35% - 14.5 tr
+
     let thue = 0;
-    for (const b of THUE_BRACKETS) {
-        if (tntt <= b.tu) break;
-        const phanThuNhap = Math.min(tntt, b.den) - b.tu;
-        thue += phanThuNhap * b.rate;
+    if (tntt <= 10_000_000) {
+        thue = tntt * 0.05;
+    } else if (tntt <= 30_000_000) {
+        thue = tntt * 0.10 - 500_000;
+    } else if (tntt <= 60_000_000) {
+        thue = tntt * 0.20 - 3_500_000;
+    } else if (tntt <= 100_000_000) {
+        thue = tntt * 0.30 - 9_500_000;
+    } else {
+        thue = tntt * 0.35 - 14_500_000;
     }
+
     return Math.max(0, thue);
 }
 
@@ -74,15 +104,23 @@ function tinhLuong(p: { luongCoBan: number; thuong: number; phuCap: number; cong
     if (isChinhThuc(p.contractType)) {
         // ==== NHÂN VIÊN CHÍNH THỨC: BH + GTGC + thuế lũy tiến ====
         const bh = tinhBH(p.luongCoBan);
+        const bhCongTy = tinhBHCongTy(p.luongCoBan);
+
         const tntt = Math.max(0, tong - bh.total - GIAM_TRU_BAN_THAN - p.soNPT * GIAM_TRU_NPT);
         const thue = tinhThue(tntt);
-        return { luongTheo, tong, bh, tntt, thue, thucLanh: Math.max(0, tong - bh.total - thue), loaiThuNhap: 'chinh_thuc' as const };
+        const tongChiPhiDN = tong + bhCongTy.total + thue + bh.total;
+
+        return { luongTheo, tong, bh, bhCongTy, tongChiPhiDN, tntt, thue, thucLanh: Math.max(0, tong - bh.total - thue), loaiThuNhap: 'chinh_thuc' as const };
     } else {
-        // ==== THỪN VIỆC / THỰC TẬP / CỘNG TÁC: thuế khấu trừ tại nguồn 10% ====
+        // ==== THỬ VIỆC / THỰC TẬP / CỘNG TÁC: thuế khấu trừ tại nguồn 10% ====
         const bh = { bhxh: 0, bhyt: 0, bhtn: 0, total: 0 };
+        const bhCongTy = { bhxh: 0, bhyt: 0, bhtn: 0, kpcd: 0, total: 0 };
+
         const tntt = tong; // không giảm trừ gì
         const thue = tong * 0.10;
-        return { luongTheo, tong, bh, tntt, thue, thucLanh: Math.max(0, tong - thue), loaiThuNhap: 'khau_tru' as const };
+        const tongChiPhiDN = tong + thue; // + bảo hiểm (0)
+
+        return { luongTheo, tong, bh, bhCongTy, tongChiPhiDN, tntt, thue, thucLanh: Math.max(0, tong - thue), loaiThuNhap: 'khau_tru' as const };
     }
 }
 
@@ -187,12 +225,43 @@ function ChiTietModal({ employee, tongHop, ky, congChuan, overrides, onClose }: 
                         </div>
                     </div>
 
+                    <div className="border-t border-gray-100" />
+
+                    {/* Phần 3 – Chi phí Doanh nghiệp */}
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-700 uppercase mb-4">Phần 3 — Chi Phí Doanh Nghiệp (Phải nộp)</h3>
+                        <div className="space-y-2">
+                            {[
+                                { label: 'Bảo hiểm Xã hội (17.5%)', val: r.bhCongTy.bhxh, cls: 'text-gray-700', show: isChinhThuc(employee.contractType) },
+                                { label: 'Bảo hiểm Y tế (3%)', val: r.bhCongTy.bhyt, cls: 'text-gray-700', show: isChinhThuc(employee.contractType) },
+                                { label: 'Bảo hiểm Thất nghiệp (1%)', val: r.bhCongTy.bhtn, cls: 'text-gray-700', show: isChinhThuc(employee.contractType) },
+                                { label: 'Kinh phí Công đoàn (0%)', val: r.bhCongTy.kpcd, cls: 'text-gray-700', show: isChinhThuc(employee.contractType) },
+                                { label: 'Tổng các khoản trích theo lương (Cty đóng)', val: r.bhCongTy.total, cls: 'font-semibold text-orange-700', show: isChinhThuc(employee.contractType) },
+                            ].filter(row => row.show).map((row, i) => (
+                                <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50">
+                                    <span className="text-sm text-gray-600">{row.label}</span>
+                                    <span className={`text-sm ${row.cls}`}>{fmt(Math.abs(row.val))}</span>
+                                </div>
+                            ))}
+                            {!isChinhThuc(employee.contractType) && (
+                                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p className="text-sm font-semibold text-yellow-700">⚠️ Không phát sinh chi phí Bảo hiểm / KPCĐ</p>
+                                    <p className="text-xs text-yellow-600 mt-1">Loại hợp đồng của nhân viên này không yêu cầu doanh nghiệp trích nộp các khoản trên.</p>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between py-3 bg-blue-50 px-4 rounded-lg mt-2">
+                                <span className="font-bold text-blue-800">TỔNG CHI PHÍ LƯƠNG DN</span>
+                                <span className="text-xl font-bold text-blue-700">{fmt(r.tongChiPhiDN)}</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
                         <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                         {isChinhThuc(employee.contractType) ? (
-                            <p className="text-xs text-blue-600">Áp dụng mức 2026: GT bản thân {fmt(GIAM_TRU_BAN_THAN)}/tháng, GT NPT {fmt(GIAM_TRU_NPT)}/người/tháng. Bảo hiểm NLĐ: BHXH 8%, BHYT 1.5%, BHTN 1%.</p>
+                            <p className="text-xs text-blue-600">Áp dụng mức 2026: GT bản thân {fmt(GIAM_TRU_BAN_THAN)}/tháng, GT NPT {fmt(GIAM_TRU_NPT)}/người/tháng. Tổng Chi Phí = Tổng Thu Nhập (A) + Bảo hiểm Cty (21.5% + KPCĐ 0%) + Bảo hiểm NLĐ + Thuế TNCN.</p>
                         ) : (
-                            <p className="text-xs text-yellow-700">Loại hợp đồng <strong>{employee.contractType}</strong>: không có bảo hiểm, không có giảm trừ gia cảnh. Thuế TNCN 10% khấu trừ tại nguồn theo Điều 25 Thông tư 111/2013/TT-BTC.</p>
+                            <p className="text-xs text-yellow-700">Loại hợp đồng <strong>{employee.contractType}</strong>: Thuế TNCN 10% khấu trừ tại nguồn theo Điều 25 Thông tư 111/2013/TT-BTC. Tổng Chi phí = Thu nhập + Thuế.</p>
                         )}
                     </div>
                 </div>
@@ -209,16 +278,15 @@ function ChiTietModal({ employee, tongHop, ky, congChuan, overrides, onClose }: 
 function ChinhSuaModal({ employee, congChuan, congThucTe, ky, initial, onSave, onClose }: {
     employee: any; congChuan: number; congThucTe: number; ky: KyChamCong | null;
     initial: { thuong: number; phuCap: number; soNPT: number };
-    onSave: (v: { thuong: number; phuCap: number; soNPT: number; luongCoBan: number; congThucTeEdit: number }) => void;
+    onSave: (v: { thuong: number; phuCap: number; soNPT: number; luongCoBan: number }) => void;
     onClose: () => void;
 }) {
     const [luongCoBan, setLuongCoBan] = useState(employee.actualSalary || 0);
-    const [congThucTeEdit, setCongThucTeEdit] = useState(congThucTe);
     const [thuong, setThuong] = useState(initial.thuong);
     const [phuCap, setPhuCap] = useState(initial.phuCap);
     const [soNPT, setSoNPT] = useState(initial.soNPT);
-    const r = useMemo(() => tinhLuong({ luongCoBan, thuong, phuCap, congThucTe: congThucTeEdit, congChuan, soNPT, contractType: employee.contractType }),
-        [luongCoBan, thuong, phuCap, congThucTeEdit, congChuan, soNPT, employee.contractType]);
+    const r = useMemo(() => tinhLuong({ luongCoBan, thuong, phuCap, congThucTe, congChuan, soNPT, contractType: employee.contractType }),
+        [luongCoBan, thuong, phuCap, congThucTe, congChuan, soNPT, employee.contractType]);
 
     return (
         <div className="modal-overlay-container">
@@ -253,12 +321,7 @@ function ChinhSuaModal({ employee, congChuan, congThucTe, ky, initial, onSave, o
                                         onChange={e => setLuongCoBan(Number(e.target.value))}
                                         className={inputCls} />
                                 </div>
-                                <div>
-                                    <label className={labelCls}>Công chính thức (ngày)</label>
-                                    <input type="number" min={0} max={congChuan} value={congThucTeEdit}
-                                        onChange={e => setCongThucTeEdit(Math.min(congChuan, Math.max(0, Number(e.target.value))))}
-                                        className={inputCls} />
-                                </div>
+                                {/* Đã gỡ bỏ input sửa Công thực tế. Dữ liệu công thực tế được lấy trực tiếp từ Quản lý chấm công */}
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -303,7 +366,7 @@ function ChinhSuaModal({ employee, congChuan, congThucTe, ky, initial, onSave, o
                         <h3 className="text-sm font-bold text-gray-700 uppercase mb-4">Phần 2 — Kết Quả Tính Lương</h3>
                         <div className="space-y-2">
                             {[
-                                { label: 'Lương theo công thực tế', val: r.luongTheo, cls: 'font-semibold text-gray-700', sub: `${congThucTeEdit}/${congChuan} ngày × ${fmt(luongCoBan)}`, show: true },
+                                { label: 'Lương theo công thực tế', val: r.luongTheo, cls: 'font-semibold text-gray-700', sub: `${congThucTe}/${congChuan} ngày × ${fmt(luongCoBan)}`, show: true },
                                 { label: 'Phụ cấp', val: phuCap, cls: 'font-semibold text-gray-700', show: true },
                                 { label: 'Thưởng', val: thuong, cls: 'font-semibold text-green-700', show: true },
                                 { label: 'Tổng thu nhập (A)', val: r.tong, cls: 'font-bold text-gray-800', show: true },
@@ -327,19 +390,50 @@ function ChinhSuaModal({ employee, congChuan, congThucTe, ky, initial, onSave, o
                         </div>
                     </div>
 
+                    <div className="border-t border-gray-100" />
+
+                    {/* Phần 3 – Chi phí Doanh nghiệp */}
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-700 uppercase mb-4">Phần 3 — Chi Phí Doanh Nghiệp (Phải nộp)</h3>
+                        <div className="space-y-2">
+                            {[
+                                { label: 'Bảo hiểm Xã hội (17.5%)', val: r.bhCongTy.bhxh, cls: 'text-gray-700', show: isChinhThuc(employee.contractType) },
+                                { label: 'Bảo hiểm Y tế (3%)', val: r.bhCongTy.bhyt, cls: 'text-gray-700', show: isChinhThuc(employee.contractType) },
+                                { label: 'Bảo hiểm Thất nghiệp (1%)', val: r.bhCongTy.bhtn, cls: 'text-gray-700', show: isChinhThuc(employee.contractType) },
+                                { label: 'Kinh phí Công đoàn (0%)', val: r.bhCongTy.kpcd, cls: 'text-gray-700', show: isChinhThuc(employee.contractType) },
+                                { label: 'Tổng các khoản trích theo lương (Cty đóng)', val: r.bhCongTy.total, cls: 'font-semibold text-orange-700', show: isChinhThuc(employee.contractType) },
+                            ].filter(row => row.show).map((row, i) => (
+                                <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50">
+                                    <span className="text-sm text-gray-600">{row.label}</span>
+                                    <span className={`text-sm ${row.cls}`}>{fmt(Math.abs(row.val))}</span>
+                                </div>
+                            ))}
+                            {!isChinhThuc(employee.contractType) && (
+                                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p className="text-sm font-semibold text-yellow-700">⚠️ Không phát sinh chi phí Bảo hiểm / KPCĐ</p>
+                                    <p className="text-xs text-yellow-600 mt-1">Loại hợp đồng của nhân viên này không yêu cầu doanh nghiệp trích nộp các khoản trên.</p>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between py-3 bg-blue-50 px-4 rounded-lg mt-2">
+                                <span className="font-bold text-blue-800">TỔNG CHI PHÍ LƯƠNG DN</span>
+                                <span className="text-xl font-bold text-blue-700">{fmt(r.tongChiPhiDN)}</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
                         <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                         {isChinhThuc(employee.contractType) ? (
-                            <p className="text-xs text-blue-600">Áp dụng mức 2026: GT bản thân {fmt(GIAM_TRU_BAN_THAN)}/tháng, GT NPT {fmt(GIAM_TRU_NPT)}/người/tháng. Bảo hiểm NLĐ: BHXH 8%, BHYT 1.5%, BHTN 1%.</p>
+                            <p className="text-xs text-blue-600">Áp dụng mức 2026: GT bản thân {fmt(GIAM_TRU_BAN_THAN)}/tháng, GT NPT {fmt(GIAM_TRU_NPT)}/người/tháng. Tổng Chi Phí DN = Tổng Thu Nhập (A) + Bảo hiểm Cty đóng (21.5% + KPCĐ 0%) + Bảo hiểm NLĐ đóng + Thuế TNCN.</p>
                         ) : (
-                            <p className="text-xs text-yellow-700">Loại hợp đồng <strong>{employee.contractType}</strong>: không có bảo hiểm, không có giảm trừ gia cảnh. Thuế TNCN 10% khấu trừ tại nguồn.</p>
+                            <p className="text-xs text-yellow-700">Loại hợp đồng <strong>{employee.contractType}</strong>: Thuế TNCN 10% khấu trừ tại nguồn. Tổng Chi Phí DN = Thu nhập + Thuế.</p>
                         )}
                     </div>
                 </div>
 
                 <div className="border-t border-gray-200 px-6 py-4 flex justify-center gap-3">
                     <button onClick={onClose} className="px-8 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium min-w-[140px]">Hủy bỏ</button>
-                    <button onClick={() => onSave({ thuong, phuCap, soNPT, luongCoBan, congThucTeEdit })}
+                    <button onClick={() => onSave({ thuong, phuCap, soNPT, luongCoBan })}
                         className="px-8 py-2.5 bg-[#004aad] hover:bg-[#1557A0] text-white rounded-lg transition-colors font-medium min-w-[140px] flex items-center gap-2 justify-center">
                         <Save className="w-4 h-4" /> Xác nhận lưu
                     </button>
@@ -510,7 +604,7 @@ export function QuanLyTinhLuong() {
             const ov = rowOverrides[emp.employeeId] ?? { thuong: 0, phuCap: 0, soNPT: 0 };
             // Apply all overrides explicitly — saved values take full priority
             const luongCoBanCalc = ov.luongCoBan ?? emp.actualSalary ?? 0;
-            const congThucTe = ov.congThucTeEdit ?? congThucTeRaw;
+            const congThucTe = congThucTeRaw; // Luôn dùng data chấm công thực tế
             const r = tinhLuong({
                 luongCoBan: luongCoBanCalc,
                 thuong: ov.thuong ?? 0,
@@ -727,8 +821,8 @@ export function QuanLyTinhLuong() {
             {editTarget && (
                 <ChinhSuaModal
                     employee={editTarget}
-                    congChuan={tongHopMap[editTarget.employeeId]?.congChuan ?? congChuan}
-                    congThucTe={tongHopMap[editTarget.employeeId]?.congChinhThuc ?? 0}
+                    congChuan={editTarget.empCongChuan}
+                    congThucTe={editTarget.congThucTe} // Passed the live aggregated value
                     ky={selectedKy}
                     initial={rowOverrides[editTarget.employeeId] ?? { thuong: 0, phuCap: 0, soNPT: 0 }}
                     onSave={async val => {
@@ -747,7 +841,7 @@ export function QuanLyTinhLuong() {
                                     thuong: val.thuong ?? 0,
                                     soNPT: val.soNPT ?? 0,
                                     luongCoBan: val.luongCoBan ?? null,
-                                    congThucTe: val.congThucTeEdit ?? null,
+                                    congThucTe: null, // LUÔN NUll để dùng số liệu chấm công
                                 });
                             } catch (e) {
                                 console.error('Lưu salary record thất bại:', e);

@@ -11,24 +11,32 @@ router.use(auth_1.authenticate);
 // GET /api/payment-methods
 router.get('/', async (req, res) => {
     try {
-        const paymentMethods = await prisma_1.default.paymentMethod.findMany({
-            orderBy: { name: 'asc' },
-            include: {
-                _count: { select: { transactions: true, partners: true } },
-                transactions: { select: { amount: true } }
-            }
-        });
-        // Compute current balance = opening_balance - SUM(all linked transactions)
-        const result = paymentMethods.map((pm) => {
-            const totalTransactions = pm.transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-            const currentBalance = (pm.openingBalance || 0) - totalTransactions;
-            return {
-                ...pm,
-                transactions: undefined, // don't expose raw transactions list here
-                balance: currentBalance,
-                openingBalance: pm.openingBalance || 0,
-            };
-        });
+        const paymentMethods = await prisma_1.default.$queryRaw `
+            SELECT 
+                pm.*,
+                COALESCE(SUM(t.amount), 0) AS "totalTransactions",
+                (pm.opening_balance - COALESCE(SUM(t.amount), 0)) AS "balance"
+            FROM payment_methods pm
+            LEFT JOIN transactions t ON t.payment_method_id = pm.id
+            GROUP BY pm.id
+            ORDER BY pm.name ASC
+        `;
+        // Map snake_case to camelCase for frontend
+        const result = paymentMethods.map((pm) => ({
+            id: pm.id,
+            code: pm.code,
+            name: pm.name,
+            type: pm.type,
+            accountInfo: pm.account_info,
+            owner: pm.owner,
+            buName: pm.bu_name,
+            status: pm.status,
+            openingBalance: Number(pm.opening_balance || 0),
+            balance: Number(pm.balance || 0),
+            totalTransactions: Number(pm.totalTransactions || 0),
+            createdAt: pm.created_at,
+            updatedAt: pm.updated_at,
+        }));
         res.json(result);
     }
     catch (error) {
@@ -39,15 +47,14 @@ router.get('/', async (req, res) => {
 // POST /api/payment-methods
 router.post('/', async (req, res) => {
     try {
-        const { openingBalance, ...rest } = req.body;
+        const { openingBalance, balance, ...rest } = req.body;
+        const ob = openingBalance ?? 0;
         const paymentMethod = await prisma_1.default.paymentMethod.create({
-            data: {
-                ...rest,
-                openingBalance: openingBalance || 0,
-                balance: openingBalance || 0, // initial balance = opening balance
-            }
+            data: { ...rest, balance: ob }
         });
-        res.status(201).json(paymentMethod);
+        // Also set opening_balance via raw SQL
+        await prisma_1.default.$executeRawUnsafe(`UPDATE payment_methods SET opening_balance = $1 WHERE id = $2`, ob, paymentMethod.id);
+        res.status(201).json({ ...paymentMethod, openingBalance: ob });
     }
     catch (error) {
         console.error('Create payment method error:', error);
@@ -57,16 +64,18 @@ router.post('/', async (req, res) => {
 // PUT /api/payment-methods/:id
 router.put('/:id', async (req, res) => {
     try {
-        const { openingBalance, ...rest } = req.body;
-        const data = { ...rest };
-        if (openingBalance !== undefined) {
-            data.openingBalance = openingBalance;
-        }
+        const { openingBalance, balance, ...rest } = req.body;
+        const id = req.params.id;
+        // Update main fields via Prisma (excluding openingBalance and balance)
         const paymentMethod = await prisma_1.default.paymentMethod.update({
-            where: { id: req.params.id },
-            data
+            where: { id },
+            data: rest
         });
-        res.json(paymentMethod);
+        // Update opening_balance via raw SQL if provided
+        if (openingBalance !== undefined) {
+            await prisma_1.default.$executeRawUnsafe(`UPDATE payment_methods SET opening_balance = $1 WHERE id = $2`, Number(openingBalance), id);
+        }
+        res.json({ ...paymentMethod, openingBalance: openingBalance ?? 0 });
     }
     catch (error) {
         console.error('Update payment method error:', error);

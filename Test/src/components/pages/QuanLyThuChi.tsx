@@ -1108,13 +1108,20 @@ export function QuanLyThuChi() {
     const expense = paidTxns.filter(t => t.transactionType === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
     const debt = paidTxns.filter(t => t.transactionType === 'LOAN').reduce((sum, t) => sum + t.amount, 0);
 
+    // Filter payment methods by BU if needed, or sum all
+    const applicablePMs = filterBU === 'all'
+      ? paymentMethods
+      : paymentMethods; // For now, sum all payment methods' opening balances since accounts are normally global unless specifically tied to BU.
+
+    const totalOpeningBalance = paymentMethods.reduce((sum, pm) => sum + (Number(pm.openingBalance) || 0), 0);
+
     return {
       income,
       expense,
-      balance: income - expense,
+      balance: totalOpeningBalance + income - expense,
       debt
     };
-  }, [allTransactions]);
+  }, [allTransactions, paymentMethods, filterBU]);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen font-sans">

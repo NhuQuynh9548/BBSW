@@ -11,10 +11,22 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         const paymentMethods: any[] = await prisma.$queryRaw`
             SELECT 
                 pm.*,
-                COALESCE(SUM(t.amount), 0) AS "totalTransactions",
-                (pm.opening_balance - COALESCE(SUM(t.amount), 0)) AS "balance"
+                COALESCE(SUM(
+                    CASE 
+                        WHEN t.transaction_type = 'INCOME' THEN t.amount
+                        WHEN t.transaction_type = 'EXPENSE' THEN -t.amount
+                        ELSE 0
+                    END
+                ), 0) AS "totalTransactions",
+                (pm.opening_balance + COALESCE(SUM(
+                    CASE 
+                        WHEN t.transaction_type = 'INCOME' THEN t.amount
+                        WHEN t.transaction_type = 'EXPENSE' THEN -t.amount
+                        ELSE 0
+                    END
+                ), 0)) AS "balance"
             FROM payment_methods pm
-            LEFT JOIN transactions t ON t.payment_method_id = pm.id
+            LEFT JOIN transactions t ON t.payment_method_id = pm.id AND t.payment_status = 'PAID' AND t.approval_status NOT IN ('CANCELLED', 'REJECTED')
             GROUP BY pm.id
             ORDER BY pm.name ASC
         `;
