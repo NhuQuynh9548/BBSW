@@ -63,6 +63,8 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
 
         // Build Where Clause
         let where: any = {
+            paymentStatus: 'PAID',
+            approvalStatus: { notIn: ['CANCELLED', 'REJECTED'] },
             ...buildDateFilter(startDate, endDate)
         };
 
@@ -136,6 +138,8 @@ router.get('/revenue-chart', async (req: AuthRequest, res: Response) => {
         }
 
         let where: any = {
+            paymentStatus: 'PAID',
+            approvalStatus: { notIn: ['CANCELLED', 'REJECTED'] },
             ...buildDateFilter(startDate, endDate)
         };
 
@@ -306,6 +310,8 @@ router.get('/expense-chart', async (req: AuthRequest, res: Response) => {
 
         let where: any = {
             transactionType: 'EXPENSE',
+            paymentStatus: 'PAID',
+            approvalStatus: { notIn: ['CANCELLED', 'REJECTED'] },
             ...buildDateFilter(startDate, endDate)
         };
 
@@ -400,6 +406,8 @@ router.get('/bu-stats', async (req: AuthRequest, res: Response) => {
         // Ideally we would filter by date range here too
         const transactions = await prisma.transaction.findMany({
             where: {
+                paymentStatus: 'PAID',
+                approvalStatus: { notIn: ['CANCELLED', 'REJECTED'] },
                 ...buildDateFilter(startDate, endDate)
             },
             include: { allocationPreviews: true }

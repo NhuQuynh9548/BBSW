@@ -623,21 +623,220 @@ export function QuanLyTinhLuong() {
     const printPayslip = (row: any) => {
         const w = window.open('', '_blank');
         if (!w) return;
-        w.document.write(`<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>Phiếu lương – ${row.fullName}</title>
-<style>body{font-family:Arial,sans-serif;padding:32px;max-width:680px;margin:0 auto}h1{text-align:center;color:#004aad;font-size:22px}.info{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:16px 0}.info label{font-size:10px;text-transform:uppercase;color:#888;font-weight:bold;display:block}.info span{font-size:13px;font-weight:bold}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#004aad;color:#fff;padding:8px 12px;text-align:left;font-size:11px}td{padding:8px 12px;font-size:12px;border-bottom:1px solid #eee}.r{text-align:right;font-weight:bold}.red{color:#dc2626}.total td{background:#f0f7ff;font-weight:bold;border-top:2px solid #004aad;color:#004aad}.green{color:#16a34a}footer{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:40px;text-align:center;font-size:11px;color:#666}footer div{border-top:1px dashed #ccc;padding-top:8px}</style></head><body>
-<h1>PHIẾU LƯƠNG</h1><p style="text-align:center;color:#666;font-size:12px">${selectedKy?.tenKy ?? ''} • In ngày ${new Date().toLocaleDateString('vi-VN')}</p>
-<div class="info"><div><label>Họ và tên</label><span>${row.fullName}</span></div><div><label>Mã NV</label><span>${row.employeeId}</span></div><div><label>Đơn vị</label><span>${row.businessUnit || '—'}</span></div><div><label>Công TT/Chuẩn</label><span>${row.congThucTe}/${congChuan} ngày</span></div></div>
-<table><thead><tr><th>Khoản mục</th><th class="r">Số tiền (VND)</th></tr></thead><tbody>
-<tr><td>Lương cơ bản</td><td class="r">${fmt(row.actualSalary || 0)}</td></tr>
-<tr><td>Lương theo công thực tế</td><td class="r">${fmt(row.r.luongTheo)}</td></tr>
-<tr><td>Phụ cấp</td><td class="r">${fmt(row.ov?.phuCap || 0)}</td></tr>
-<tr><td>Thưởng</td><td class="r">${fmt(row.ov?.thuong || 0)}</td></tr>
-<tr><td><strong>Tổng thu nhập (A)</strong></td><td class="r"><strong>${fmt(row.r.tong)}</strong></td></tr>
-<tr><td class="red">Bảo hiểm NLĐ (BHXH+BHYT+BHTN)</td><td class="r red">-${fmt(row.r.bh.total)}</td></tr>
-<tr><td class="red">Thuế TNCN (5 bậc 2026)</td><td class="r red">-${fmt(row.r.thue)}</td></tr>
-</tbody><tfoot><tr class="total"><td>THỰC LÃNH</td><td class="r green">${fmt(row.r.thucLanh)}</td></tr></tfoot></table>
-<footer><div>Người lập phiếu<br/><br/>.............................</div><div>Nhân viên xác nhận<br/><br/>.............................</div></footer>
-<script>window.onload=()=>window.print();<\/script></body></html>`);
+
+        const donGia = row.empCongChuan > 0 ? (row.luongCoBanCalc || 0) / row.empCongChuan : 0;
+        const luongCC = (row.tongHop?.congChinhThuc ?? 0) * donGia;
+        const luongTV = (row.tongHop?.congThuViec ?? 0) * donGia;
+        const luongPhepLe = ((row.tongHop?.phepNam ?? 0) + (row.tongHop?.nghiLe ?? 0)) * donGia;
+        const luongNghiBu = (row.tongHop?.nghiBu ?? 0) * donGia;
+        const soPhepLe = (row.tongHop?.phepNam ?? 0) + (row.tongHop?.nghiLe ?? 0);
+        const soNPT = row.ov?.soNPT ?? 0;
+        const khongLuong = row.tongHop?.khongLuong ?? 0;
+        const luongCoBanCalc = row.luongCoBanCalc || 0;
+
+        w.document.write(`<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Phiếu lương – ${row.fullName}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#222;padding:28px;max-width:750px;margin:0 auto;background:#fff}
+  .header{text-align:center;margin-bottom:16px;border-bottom:3px solid #004aad;padding-bottom:12px}
+  .header h1{font-size:20px;font-weight:800;color:#004aad;letter-spacing:1px;text-transform:uppercase}
+  .header p{font-size:11px;color:#666;margin-top:4px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;background:#f0f7ff;border:1px solid #cce0ff;border-radius:6px;padding:12px 16px;margin-bottom:16px}
+  .info-grid .item label{font-size:9px;text-transform:uppercase;color:#888;font-weight:700;letter-spacing:0.5px;display:block}
+  .info-grid .item span{font-size:12px;font-weight:700;color:#111}
+  table{width:100%;border-collapse:collapse;margin-top:0}
+  thead tr{background:#004aad;color:#fff}
+  thead th{padding:8px 10px;font-size:10px;text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:0.3px}
+  thead th.r{text-align:right}
+  tbody tr:nth-child(even){background:#f9fbff}
+  tbody tr:hover{background:#eef4ff}
+  td{padding:7px 10px;font-size:11px;border-bottom:1px solid #e8eef7;vertical-align:middle}
+  td.r{text-align:right;font-weight:600}
+  td.c{text-align:center}
+  td.red{color:#c00}
+  td.green{color:#16a34a}
+  tr.section-header td{background:#e6edf7;font-weight:800;font-size:10px;text-transform:uppercase;color:#004aad;letter-spacing:0.5px;padding:5px 10px;border-top:1px solid #b0c8f0}
+  tr.subtotal td{background:#ddeeff;font-weight:700;font-size:11px;color:#003a8c}
+  tr.net td{background:#004aad;color:#fff;font-size:14px;font-weight:800;padding:10px 12px}
+  tr.net td.r, tr.net td.green{color:#fff;font-size:14px;font-weight:800}
+  tr.note td{background:#fff8e1;font-size:10px;color:#888;font-style:italic}
+  .footer{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:32px;text-align:center;font-size:11px;color:#666}
+  .footer div{border-top:1px dashed #bbb;padding-top:8px}
+  @media print{body{padding:16px}hr{display:none}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Phiếu Lương Tháng</h1>
+  <p>${selectedKy?.tenKy ?? ''} &nbsp;•&nbsp; In ngày ${new Date().toLocaleDateString('vi-VN')}</p>
+</div>
+
+<div class="info-grid">
+  <div class="item"><label>Họ và tên</label><span>${row.fullName}</span></div>
+  <div class="item"><label>Mã nhân viên</label><span>${row.employeeId}</span></div>
+  <div class="item"><label>Đơn vị / Bộ phận</label><span>${row.businessUnit || '—'}</span></div>
+  <div class="item"><label>Chức vụ</label><span>${row.position || '—'}</span></div>
+  <div class="item"><label>Công TT / Số ngày chuẩn</label><span>${row.congThucTe} / ${row.empCongChuan}</span></div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:52%">Khoản mục</th>
+      <th class="r" style="width:14%">Số công</th>
+      <th class="r" style="width:34%">Số tiền (VND)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="section-header"><td colspan="3">A. Lương & Công</td></tr>
+    <tr>
+      <td>Lương tháng (Bao gồm phụ cấp)</td>
+      <td class="r c">—</td>
+      <td class="r">${fmt(luongCoBanCalc)}</td>
+    </tr>
+    <tr>
+      <td>Số công chuẩn</td>
+      <td class="r c">${row.empCongChuan}</td>
+      <td class="r c">—</td>
+    </tr>
+    <tr>
+      <td>Đơn giá / ngày công</td>
+      <td class="r c">—</td>
+      <td class="r">${donGia > 0 ? fmt(donGia) : '—'}</td>
+    </tr>
+
+    <tr class="section-header"><td colspan="3">B. Chi Tiết Lương Thời Gian Theo Công</td></tr>
+    <tr>
+      <td>Lương thời gian được hưởng 100% lương</td>
+      <td class="r c">${row.tongHop?.congChinhThuc ?? 0}</td>
+      <td class="r">${fmt(luongCC)}</td>
+    </tr>
+    <tr>
+      <td>Lương thử việc</td>
+      <td class="r c">${row.tongHop?.congThuViec ?? 0}</td>
+      <td class="r">${fmt(luongTV)}</td>
+    </tr>
+    <tr>
+      <td>Lương ngày phép năm / nghỉ lễ / chính sách hưởng 100%</td>
+      <td class="r c">${soPhepLe}</td>
+      <td class="r">${fmt(luongPhepLe)}</td>
+    </tr>
+    <tr>
+      <td>Lương ngày nghỉ bù được hưởng 100% lương</td>
+      <td class="r c">${row.tongHop?.nghiBu ?? 0}</td>
+      <td class="r">${fmt(luongNghiBu)}</td>
+    </tr>
+    <tr>
+      <td>Ngày tăng ca</td>
+      <td class="r c">0</td>
+      <td class="r">${fmt(0)}</td>
+    </tr>
+    <tr>
+      <td>Ngày nghỉ không lương</td>
+      <td class="r c">${khongLuong}</td>
+      <td class="r">0</td>
+    </tr>
+
+    <tr class="section-header"><td colspan="3">C. Thưởng, Phụ cấp & Khấu trừ Khác</td></tr>
+    <tr>
+      <td>Thưởng doanh số</td>
+      <td class="r c">—</td>
+      <td class="r">${fmt(row.ov?.thuong || 0)}</td>
+    </tr>
+    <tr>
+      <td>Phụ cấp</td>
+      <td class="r c">—</td>
+      <td class="r">${fmt(row.ov?.phuCap || 0)}</td>
+    </tr>
+    <tr>
+      <td>Phụ cấp khác: Cơm + Đồng phục <em>(Đã tính trong lương)</em></td>
+      <td class="r c">—</td>
+      <td class="r">${fmt(0)}</td>
+    </tr>
+    <tr>
+      <td>Trừ lương khác</td>
+      <td class="r c">—</td>
+      <td class="r red">-${fmt(0)}</td>
+    </tr>
+
+    <tr class="subtotal">
+      <td colspan="2">Tổng Thu Nhập (A)</td>
+      <td class="r">${fmt(row.r.tong)}</td>
+    </tr>
+
+    <tr class="section-header"><td colspan="3">D. Lương Đóng Bảo Hiểm & Khấu Trừ (NLĐ đóng)</td></tr>
+    <tr>
+      <td>Lương đóng bảo hiểm (cơ sở báo tăng)</td>
+      <td class="r c">—</td>
+      <td class="r">${fmt(luongCoBanCalc)}</td>
+    </tr>
+    <tr>
+      <td class="red">&nbsp;&nbsp;BHXH (8%)</td>
+      <td class="r c">—</td>
+      <td class="r red">-${fmt(row.r.bh.bhxh)}</td>
+    </tr>
+    <tr>
+      <td class="red">&nbsp;&nbsp;BHYT (1,5%)</td>
+      <td class="r c">—</td>
+      <td class="r red">-${fmt(row.r.bh.bhyt)}</td>
+    </tr>
+    <tr>
+      <td class="red">&nbsp;&nbsp;BHTN (1%)</td>
+      <td class="r c">—</td>
+      <td class="r red">-${fmt(row.r.bh.bhtn)}</td>
+    </tr>
+    <tr>
+      <td class="red">&nbsp;&nbsp;KPCĐ (0%)</td>
+      <td class="r c">—</td>
+      <td class="r red">-${fmt(0)}</td>
+    </tr>
+    <tr class="subtotal">
+      <td colspan="2" class="red">Tổng khấu trừ các khoản Bảo hiểm</td>
+      <td class="r red">-${fmt(row.r.bh.total)}</td>
+    </tr>
+
+    <tr class="section-header"><td colspan="3">E. Thuế Thu Nhập Cá Nhân (TNCN)</td></tr>
+    <tr>
+      <td>Giảm trừ bản thân</td>
+      <td class="r c">—</td>
+      <td class="r">${fmt(GIAM_TRU_BAN_THAN)}</td>
+    </tr>
+    <tr>
+      <td>Giảm trừ người phụ thuộc</td>
+      <td class="r c">${soNPT}</td>
+      <td class="r">${fmt(soNPT * GIAM_TRU_NPT)}</td>
+    </tr>
+    <tr>
+      <td>Thu nhập tính thuế TNCN</td>
+      <td class="r c">—</td>
+      <td class="r">${fmt(row.r.tntt)}</td>
+    </tr>
+    <tr>
+      <td class="red">Tổng thuế TNCN</td>
+      <td class="r c">—</td>
+      <td class="r red">-${fmt(row.r.thue)}</td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr class="net">
+      <td colspan="2">NHÂN VIÊN THỰC NHẬN</td>
+      <td class="r">${fmt(row.r.thucLanh)}</td>
+    </tr>
+  </tfoot>
+</table>
+
+<div class="footer">
+  <div>Người lập phiếu<br/><br/><br/>.............................</div>
+  <div>Nhân viên xác nhận<br/><br/><br/>.............................</div>
+</div>
+
+<script>window.onload=()=>window.print();<\/script>
+</body>
+</html>`);
         w.document.close();
     };
 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 // Force re-compilation
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -28,7 +28,8 @@ interface TransactionFile {
 }
 
 interface AllocationPreview {
-  bu: string;
+  buId?: string;
+  buName: string;
   percentage: number;
   amount: number;
 }
@@ -64,6 +65,7 @@ interface Transaction {
   allocationRuleId?: string;
   isAdvance: boolean;
   costAllocation?: 'DIRECT' | 'INDIRECT';
+  allocationPreviews?: AllocationPreview[];
   rejectionReason?: string;
 }
 
@@ -1097,28 +1099,53 @@ export function QuanLyThuChi() {
 
   // Calculate Summary Stats - Only include PAID transactions for totals, exclude REJECTED/CANCELLED
   const stats = React.useMemo(() => {
-    // KPI only counts PAID transactions
+    // KPIs only count PAID transactions (for Income/Expense in this period)
     const paidTxns = allTransactions.filter(t =>
       t.paymentStatus === 'PAID' &&
       t.approvalStatus !== 'CANCELLED' &&
       t.approvalStatus !== 'REJECTED'
     );
 
-    const income = paidTxns.filter(t => t.transactionType === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
-    const expense = paidTxns.filter(t => t.transactionType === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
-    const debt = paidTxns.filter(t => t.transactionType === 'LOAN').reduce((sum, t) => sum + t.amount, 0);
+    // Compute amount taking into account BU filter and Direct vs Indirect allocation
+    const getAmountForCurrentBU = (t: Transaction): number => {
+      // If we are looking at ALL BUs, we just sum up the total transaction amount
+      if (filterBU === 'all') return t.amount;
 
-    // Filter payment methods by BU if needed, or sum all
-    const applicablePMs = filterBU === 'all'
-      ? paymentMethods
-      : paymentMethods; // For now, sum all payment methods' opening balances since accounts are normally global unless specifically tied to BU.
+      // If viewing a specific BU, handle the split
+      if (t.costAllocation === 'INDIRECT' && t.allocationPreviews) {
+        // Find the allocation for the currently selected BU
+        const selectedBuName = businessUnits.find(bu => bu.id === filterBU)?.name;
+        const allocation = t.allocationPreviews.find(ap => ap.buName === selectedBuName);
+        return allocation ? allocation.amount : 0;
+      }
 
-    const totalOpeningBalance = paymentMethods.reduce((sum, pm) => sum + (Number(pm.openingBalance) || 0), 0);
+      // Direct allocation
+      return (t.businessUnitId === filterBU) ? t.amount : 0;
+    };
+
+    let income = 0;
+    let expense = 0;
+    let debt = 0;
+
+    paidTxns.forEach(t => {
+      const amountForBU = getAmountForCurrentBU(t);
+      if (t.transactionType === 'INCOME') {
+        income += amountForBU;
+      } else if (t.transactionType === 'EXPENSE') {
+        expense += amountForBU;
+      } else if (t.transactionType === 'LOAN') {
+        debt += amountForBU;
+      }
+    });
+
+    // Ensure we calculate the actual lifetime balance from PaymentMethods correctly
+    const currentBalance = paymentMethods.reduce((sum, pm) => sum + (Number(pm.balance) || 0), 0);
 
     return {
       income,
       expense,
-      balance: totalOpeningBalance + income - expense,
+      profit: income - expense, // True profit for this period
+      balance: currentBalance, // Total account balance of all time
       debt
     };
   }, [allTransactions, paymentMethods, filterBU]);
@@ -1170,12 +1197,12 @@ export function QuanLyThuChi() {
         </div>
 
         {/* Profit */}
-        <div className={`${stats.balance >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} rounded-xl shadow-md p-6 border`}>
+        <div className={`${stats.profit >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} rounded-xl shadow-md p-6 border`}>
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <p className={`text-sm mb-2 ${stats.balance >= 0 ? 'text-green-800' : 'text-red-800'}`}>Lợi nhuận</p>
-              <h3 className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-green-800' : 'text-red-800'}`}>
-                {formatCurrency(stats.balance)}
+              <p className={`text-sm mb-2 ${stats.profit >= 0 ? 'text-green-800' : 'text-red-800'}`}>Lợi nhuận</p>
+              <h3 className={`text-2xl font-bold ${stats.profit >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                {formatCurrency(stats.profit)}
               </h3>
             </div>
           </div>
